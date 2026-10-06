@@ -1,8 +1,8 @@
-Usage: dsh [--profile] <name> [options] [app-args...]
-       dsh plugin --profile <name> <pnpm-args...>
+Usage: agent-base [--profile] <name> [options] [app-args...]
+       agent-base plugin --profile <name> <pnpm-args...>
 
-dsh: boot a DeepSeek Harness profile — an ordered stack of plugin-bundle patch
-layers under your own overrides.
+agent base: reusable Agent workspace built on DeepSeek Harness. Both agent-base
+and dsh launch the same profile runtime.
 
 Arguments:
   args                           arguments for the booted profile's app (see:

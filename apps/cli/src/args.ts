@@ -89,6 +89,7 @@ function rejectElectronProfile(program: Command, profile: string): void {
 /** The launcher's own help text; each app prints its own. */
 const HELP_EXAMPLES = `
 Examples:
+  agent-base web                            boot the Agent Base web profile (dsh is a compatibility alias)
   dsh web                                   boot the web profile (same as: dsh --profile web)
   dsh rescue --from-default-profile web
                                             create rescue from the shipped web template, then boot it
@@ -150,10 +151,10 @@ export function parseDshArgs(argv: readonly string[], version: string, manageDes
   // inferred type would be circular through its own chain.
   const program: Command = new Command()
   program
-    .name('dsh')
+    .name('agent-base')
     .version(version, '-V, --version', 'output the version number')
-    .usage('[--profile] <name> [options] [app-args...]\n       dsh plugin --profile <name> <pnpm-args...>')
-    .description('dsh: boot a DeepSeek Harness profile — an ordered stack of plugin-bundle patch layers under your own overrides.')
+    .usage('[--profile] <name> [options] [app-args...]\n       agent-base plugin --profile <name> <pnpm-args...>')
+    .description('agent base: reusable Agent workspace built on DeepSeek Harness. Both agent-base and dsh launch the same profile runtime.')
     .addHelpText('after', HELP_EXAMPLES)
     .exitOverride()
     // The launcher's flags come first and end at the first token it does not

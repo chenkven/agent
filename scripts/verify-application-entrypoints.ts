@@ -25,7 +25,7 @@ interface LauncherPolicy {
 
 /** Public product launcher plus the build-only WebWorker packer. */
 const MANIFEST_BIN_ALLOWLIST = new Map<string, ManifestBin>([
-  ['apps/cli/package.json', { dsh: 'lib/bin.js' }],
+  ['apps/cli/package.json', { dsh: 'lib/bin.js', 'agent-base': 'lib/bin.js' }],
   ['packages/experimental/webworker-packer/package.json', { 'dsh-pack-vfs-image': './bin.js' }],
 ])
 
@@ -198,6 +198,6 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
     for (const failure of failures) console.error(`  ${failure}`)
     process.exitCode = 1
   } else {
-    console.log('verify-application-entrypoints: dsh is the only supported Node application launcher.')
+    console.log('verify-application-entrypoints: agent-base and dsh share the supported Node application launcher.')
   }
 }

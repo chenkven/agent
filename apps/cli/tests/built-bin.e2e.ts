@@ -351,6 +351,11 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
     expect(bare.stderr).toContain('--profile <name> is required')
     const help = await runBuiltBin(['--help'])
     expect(help.code).toBe(0)
+    const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      bin: Record<string, string>
+    }
+    expect(manifest.bin['agent-base']).toBe(manifest.bin.dsh)
+    expect(help.stdout).toContain('Usage: agent-base')
     await expect(help.stdout).toMatchFileSnapshot('./expected/launcher-help.txt')
     expect(help.stdout).toContain('dsh --profile web')
     expect(help.stdout).toContain('dsh plugin --profile')
