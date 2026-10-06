@@ -38,6 +38,9 @@ async function bench() {
       update: vi.fn(async () => ({ ok: true as const, value: {} })),
     },
     skills: { list: vi.fn(async () => ({ ok: true as const, value: { skills: [] } })) },
+    permissionPresets: { catalog: vi.fn(async () => ({ ok: true as const, value: { options: [], defaultOptions: [], defaultPreset: 'workspace-write' } })) },
+    session: { projections: vi.fn(async () => ({ ok: true as const, value: null })) },
+    commands: { execute: vi.fn(async () => ({ ok: true as const, value: undefined })) },
     agentPresets: {
       list: vi.fn(async () => ({ ok: true as const, value: { presets: [] } })),
       read: vi.fn(async () => ({ ok: true as const, value: { agentPreset: 'x', content: '' } })),
@@ -129,7 +132,7 @@ describe('ui-plugin-manager browser plugin', () => {
   it('declares only the services the page and its Remote methods use', () => {
     expect(inject).toEqual([
       'slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe',
-      'remote.skills', 'remote.agentPresets', 'remote.settings', 'sessions', 'configForms', 'layout',
+      'remote.skills', 'remote.agentPresets', 'remote.settings', 'remote.permissionPresets', 'remote.session', 'remote.commands', 'sessions', 'configForms', 'layout',
     ])
   })
 

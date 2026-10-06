@@ -20,7 +20,12 @@ export interface CapabilityPrompt {
   readonly isDefault: boolean
   readonly broken?: string
 }
-export type CapabilityTab = 'skills' | 'mcp' | 'prompts' | 'plugins'
+export interface CapabilityPermissions {
+  readonly current: string | null
+  readonly defaultPreset: string
+  readonly options: readonly { readonly value: string; readonly name: string; readonly description?: string }[]
+}
+export type CapabilityTab = 'skills' | 'mcp' | 'prompts' | 'plugins' | 'permissions'
 
 /** Browser actions backed by the existing Host Remotes. */
 export interface CapabilityServices {
@@ -32,6 +37,8 @@ export interface CapabilityServices {
   readonly setMcpEnabled: (id: string, enabled: boolean) => Promise<'applied' | 'restart-required'>
   readonly saveMcp: (config: ManagedMcpConfig, id?: string) => Promise<'applied' | 'restart-required'>
   readonly removeMcp: (id: string) => Promise<'applied' | 'restart-required'>
+  readonly permissions: (sessionId?: string) => Promise<CapabilityPermissions>
+  readonly setPermission: (sessionId: string, preset: string) => Promise<void>
   readonly prompts: () => Promise<readonly CapabilityPrompt[]>
   readonly promptSource: (id: string) => Promise<string>
   readonly setDefaultPrompt: (id: string) => Promise<void>
@@ -46,6 +53,7 @@ export interface CapabilityState {
   readonly skills: readonly SkillManagementEntry[]
   readonly mcp: readonly CapabilityMcp[]
   readonly prompts: readonly CapabilityPrompt[]
+  readonly permissions: CapabilityPermissions | null
   readonly source: { readonly id: string; readonly text: string } | null
   readonly busy: string | null
   readonly loading: boolean
@@ -64,14 +72,14 @@ export class CapabilityController {
   constructor(private readonly services: CapabilityServices) {
     this.store = createSnapshotStore<CapabilityState>({
       tab: 'skills', sessions: services.sessions(), skills: [], mcp: [], prompts: [],
-      source: null, busy: null, loading: false, error: null, notice: null,
+      permissions: null, source: null, busy: null, loading: false, error: null, notice: null,
     })
     this.disposers = [
       services.subscribeSessions(() => {
         const previous = this.store.getSnapshot()
         const sessions = services.sessions()
         this.store.set({ ...previous, sessions })
-        if (previous.tab === 'skills') void this.load()
+        if (previous.tab === 'skills' || previous.tab === 'permissions') void this.load()
       }),
       services.subscribeChanges(() => { void this.load() }),
     ]
@@ -99,6 +107,9 @@ export class CapabilityController {
       } else if (tab === 'mcp') {
         const mcp = await this.services.mcp()
         if (generation === this.generation) this.patch({ mcp })
+      } else if (tab === 'permissions') {
+        const permissions = await this.services.permissions(this.sessionId())
+        if (generation === this.generation) this.patch({ permissions })
       } else {
         const prompts = await this.services.prompts()
         if (generation === this.generation) this.patch({ prompts })
@@ -108,6 +119,15 @@ export class CapabilityController {
     } finally {
       if (generation === this.generation) this.patch({ loading: false })
     }
+  }
+
+  async selectPermission(preset: string): Promise<void> {
+    const sessionId = this.sessionId()
+    if (sessionId === undefined || this.store.getSnapshot().busy !== null) return
+    this.patch({ busy: preset, error: null })
+    try { await this.services.setPermission(sessionId, preset); await this.load() }
+    catch (reason: unknown) { this.patch({ error: errorText(reason) }) }
+    finally { this.patch({ busy: null }) }
   }
 
   async toggleMcp(id: string, enabled: boolean): Promise<void> {
@@ -175,6 +195,7 @@ export interface CapabilityFace {
   readonly selectCapabilityTab: (tab: CapabilityTab) => void
   readonly selectCapabilitySession: (id: string) => void
   readonly refreshCapabilities: () => void
+  readonly selectCapabilityPermission: (preset: string) => void
   readonly toggleCapabilityMcp: (id: string, enabled: boolean) => void
   readonly toggleCapabilitySkill: (name: string, modelInvocable: boolean, userInvocable: boolean) => void
   readonly saveCapabilityMcp: (config: ManagedMcpConfig, id?: string) => Promise<boolean>
@@ -190,6 +211,7 @@ export function capabilityFace(controller: CapabilityController): CapabilityFace
     selectCapabilityTab: tab => controller.selectTab(tab),
     selectCapabilitySession: id => controller.selectSession(id),
     refreshCapabilities: () => { void controller.load() },
+    selectCapabilityPermission: (preset) => { void controller.selectPermission(preset) },
     toggleCapabilityMcp: (id, enabled) => { void controller.toggleMcp(id, enabled) },
     toggleCapabilitySkill: (name, modelInvocable, userInvocable) => { void controller.toggleSkill(name, modelInvocable, userInvocable) },
     saveCapabilityMcp: (config, id) => controller.saveMcp(config, id),

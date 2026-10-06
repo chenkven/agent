@@ -7,6 +7,18 @@ export const INSTALL_PATH_EXAMPLE = '/Users/name/my-plugin'
 
 /** Simplified Chinese dictionary and key source of truth. */
 export const zh = {
+  centerPermissions: '权限',
+  centerPermissionHint: '权限切换作用于所选会话，并同步到聊天输入框。沙箱约束和审批策略由后端执行。',
+  centerPermissionCurrent: '当前权限',
+  centerPermissionDefault: '新会话默认权限',
+  centerNoPermissionSession: '请选择可用会话',
+  centerPermissionReadOnly: '沙箱：只读；审批：询问。读取文件可直接进行，写入或越界操作需要审批。',
+  centerPermissionWorkspace: '沙箱：工作区可写；审批：询问。允许工作区内写入，越界操作需要审批。',
+  centerPermissionFull: '沙箱：完全访问；审批：不询问。可以直接修改文件和运行命令，请仅用于可信任务。',
+  centerPermissionSwitch: '应用到此会话',
+  centerPermissionConfirm: '此模式允许 Agent 获得更大权限。确认你信任所选会话的任务和工具。',
+  centerPermissionAccept: '确认切换',
+
   panel: '能力中心',
   centerTitle: '能力中心',
   centerIntro: '查看和管理 Agent 可使用的能力',
@@ -267,6 +279,18 @@ export type PluginManagerLocaleKey = keyof typeof zh
 
 /** English dictionary checked against the Chinese key set. */
 export const en = {
+  centerPermissions: 'Permissions',
+  centerPermissionHint: 'Changes apply to the selected session and synchronize with its chat picker. The Host enforces sandbox and approval policies.',
+  centerPermissionCurrent: 'Current permission',
+  centerPermissionDefault: 'Default for new sessions',
+  centerNoPermissionSession: 'Choose an available session',
+  centerPermissionReadOnly: 'Sandbox: read only; approval: ask. Reading is allowed; writes and operations outside the sandbox require approval.',
+  centerPermissionWorkspace: 'Sandbox: workspace write; approval: ask. Workspace writes are allowed; operations outside it require approval.',
+  centerPermissionFull: 'Sandbox: full access; approval: never. File changes and commands can execute directly. Use for trusted tasks.',
+  centerPermissionSwitch: 'Apply to this session',
+  centerPermissionConfirm: 'This mode grants the Agent more access. Confirm that you trust this session and its tools.',
+  centerPermissionAccept: 'Confirm switch',
+
   panel: 'Capabilities',
   centerTitle: 'Capability Center',
   centerIntro: 'Discover and manage the capabilities available to agents',

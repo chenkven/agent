@@ -69,7 +69,7 @@ export const PANEL_ID = 'plugins' as MainPanelId
 /** Services required by the sidebar registration and the Remote methods; the inventory says whether the Host manages a profile. */
 export const inject = [
   'slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe',
-  'remote.skills', 'remote.agentPresets', 'remote.settings', 'sessions', 'configForms', 'layout',
+  'remote.skills', 'remote.agentPresets', 'remote.settings', 'remote.permissionPresets', 'remote.session', 'remote.commands', 'sessions', 'configForms', 'layout',
 ]
 
 /**
@@ -181,6 +181,27 @@ export function apply(ctx: ClientContext): void {
       }
       return result.value.application === 'restart-required' ? 'restart-required' : 'applied'
     },
+    permissions: async (sessionId) => {
+      const catalog = await ctx.remote.permissionPresets.catalog()
+      if (!catalog.ok) throw new Error(catalog.error.message)
+      let current: string | null = null
+      if (sessionId !== undefined) {
+        const projection = await ctx.remote.session.projections({
+          sessionId: sessionId as Parameters<typeof ctx.remote.session.projections>[0]['sessionId'],
+        })
+        if (!projection.ok) throw new Error(projection.error.message)
+        current = projection.value?.values.permissions?.currentValue ?? null
+      }
+      return { current, defaultPreset: catalog.value.defaultPreset, options: catalog.value.options }
+    },
+    setPermission: async (sessionId, preset) => {
+      const result = await ctx.remote.commands.execute(
+        sessionId as Parameters<typeof ctx.remote.commands.execute>[0], `/permission ${preset}`, [],
+      )
+      if (!result.ok) throw new Error(result.error.message)
+      if (result.value === undefined) throw new Error('Permission command unavailable')
+      if (result.value.result.kind === 'error') throw new Error(result.value.result.text)
+    },
     prompts: async () => {
       const result = await ctx.remote.agentPresets.list()
       if (!result.ok) throw new Error(result.error.message)
@@ -203,6 +224,7 @@ export function apply(ctx: ClientContext): void {
     subscribeChanges: (listener) => {
       const disposers = [
         ctx.remote.$on('plugin-manager/changed', listener),
+        ctx.remote.$on('permission-presets/catalog-changed', listener),
         ctx.remote.$on('agent-preset/selected', listener),
         ctx.remote.$on('settings/document-updated', (ns) => { if (ns === 'agent-preset-registry') listener() }),
         ctx.on('connection/reset', listener),

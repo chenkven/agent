@@ -71,6 +71,7 @@ function McpEditor({ row, t, busy, onCancel, onSave }: {
 /** Render inventories selected from the sidebar's single capability entry. */
 export function CapabilityCenter(props: CapabilityCenterProps): ReactNode {
   const state = props.useCapabilityCenter(snapshot => snapshot)
+  const [confirmPermission, setConfirmPermission] = useState<string | null>(null)
   const [editingMcp, setEditingMcp] = useState<string | null>(null)
   const [confirmingMcp, setConfirmingMcp] = useState<string | null>(null)
   useEffect(() => { props.refreshCapabilities() }, [props.refreshCapabilities])
@@ -80,7 +81,7 @@ export function CapabilityCenter(props: CapabilityCenterProps): ReactNode {
   const selectedSession = state.sessions.find(row => row.id === sessionId)
   const tabs: readonly { id: CapabilityTab; label: string }[] = [
     { id: 'skills', label: t('centerSkills') }, { id: 'mcp', label: t('centerMcp') },
-    { id: 'prompts', label: t('centerPrompts') }, { id: 'plugins', label: t('centerPlugins') },
+    { id: 'prompts', label: t('centerPrompts') }, { id: 'permissions', label: t('centerPermissions') }, { id: 'plugins', label: t('centerPlugins') },
   ]
   return <section className={css.center} data-capability-center>
     <header className={css.header}>
@@ -92,6 +93,33 @@ export function CapabilityCenter(props: CapabilityCenterProps): ReactNode {
         onClick={() => props.selectCapabilityTab(item.id)}>{item.label}</button>)}
     </nav>
     {state.tab === 'plugins' ? <PluginManagerPage {...props} /> : <div className={css.body}>
+      {state.tab === 'permissions' ? <>
+        <p className={css.hint}>{t('centerPermissionHint')}</p>
+        <label className={css.selector}>{t('centerChooseSession')}<select value={sessionId ?? ''}
+          onChange={(event) => { setConfirmPermission(null); props.selectCapabilitySession(event.target.value) }}>
+          {state.sessions.map(row => <option key={row.id} value={row.id}>{row.title}</option>)}
+        </select></label>
+        <p className={css.scope}>{t('centerPermissionCurrent')}: {state.permissions?.current ?? t('centerNoPermissionSession')}</p>
+        <p className={css.scope}>{t('centerPermissionDefault')}: {state.permissions?.defaultPreset}</p>
+        <ul className={css.cards}>{state.permissions?.options.map(option => <li className={css.card} key={option.value}>
+          <div className={css.cardTop}><h2>{option.name}</h2>
+            {state.permissions?.current === option.value ? <span className={css.badge}>{t('centerPermissionCurrent')}</span> : null}</div>
+          <p>{option.value === 'read-only' ? t('centerPermissionReadOnly') : option.value === 'workspace-write'
+            ? t('centerPermissionWorkspace') : option.value === 'danger-full-access' ? t('centerPermissionFull')
+              : option.description ?? option.value}</p>
+          <button type="button" disabled={state.busy !== null || state.loading || state.permissions?.current === null
+            || state.permissions?.current === option.value} onClick={() => {
+            if (option.value === 'danger-full-access' || option.value === 'auto') setConfirmPermission(option.value)
+            else props.selectCapabilityPermission(option.value)
+          }}>{t('centerPermissionSwitch')}</button>
+          {confirmPermission === option.value ? <div className={css.confirm}>
+            <p>{t('centerPermissionConfirm')}</p><div className={css.actions}>
+              <button type="button" onClick={() => { props.selectCapabilityPermission(option.value); setConfirmPermission(null) }}>
+                {t('centerPermissionAccept')}</button>
+              <button type="button" onClick={() => setConfirmPermission(null)}>{t('cancel')}</button>
+            </div></div> : null}
+        </li>)}</ul>
+      </> : null}
       {state.tab === 'skills' ? <>
         <p className={css.hint}>{t('centerSkillHint')}</p>
         {state.sessions.length === 0 ? <p className={css.empty}>{t('centerNoSession')}</p> : <>

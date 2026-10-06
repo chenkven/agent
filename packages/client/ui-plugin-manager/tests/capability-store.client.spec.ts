@@ -12,6 +12,8 @@ function services(): CapabilityServices {
     setMcpEnabled: vi.fn(async () => 'applied' as const),
     saveMcp: vi.fn(async () => 'applied' as const),
     removeMcp: vi.fn(async () => 'applied' as const),
+    permissions: vi.fn(async () => ({ current: 'workspace-write', defaultPreset: 'workspace-write', options: [] })),
+    setPermission: vi.fn(async () => {}),
     prompts: vi.fn(async () => [{ id: 'standard', name: 'Standard', isDefault: true }]),
     promptSource: vi.fn(async () => '- id: persona'),
     setDefaultPrompt: vi.fn(async () => {}),
@@ -20,6 +22,21 @@ function services(): CapabilityServices {
 }
 
 describe('capability inventory', () => {
+  it('writes permission through the selected session and refreshes its authoritative value', async () => {
+    let current = 'workspace-write'
+    const remote: CapabilityServices = {
+      ...services(),
+      permissions: vi.fn(async () => ({ current, defaultPreset: 'workspace-write', options: [] })),
+      setPermission: vi.fn(async (_id, preset) => { current = preset }),
+    }
+    const center = new CapabilityController(remote)
+    center.selectTab('permissions')
+    await vi.waitFor(() => expect(center.store.getSnapshot().permissions?.current).toBe('workspace-write'))
+    await center.selectPermission('read-only')
+    expect(remote.setPermission).toHaveBeenCalledWith('session-a', 'read-only')
+    expect(center.store.getSnapshot().permissions?.current).toBe('read-only')
+    center.dispose()
+  })
   it('uses the selected session for Skill discovery and the Host for MCP enablement', async () => {
     const remote = services()
     const center = new CapabilityController(remote)
