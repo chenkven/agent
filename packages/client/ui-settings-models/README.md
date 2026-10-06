@@ -27,6 +27,8 @@ Desktop product events use the optional [product analytics service](../product-a
 <a id="use-this-package"></a>
 ## Use this package
 
+Settings and the capability center render the same editor through the `settings.models.editor` slot Factory. Its Host-backed inventory and credential operations are shared; form drafts belong to each mounted occurrence. The Factory owns the provider-card and footer extension slots, so both entry points receive the same adapter contributions. The public demo's credential-only mode applies to both.
+
 Saving credentials or a custom provider preserves the selected model. The user can select an available model from the composer.
 
 DeepSeek Account appears first and DeepSeek second in the provider list; third-party providers retain their directory order.

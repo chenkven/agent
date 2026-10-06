@@ -312,6 +312,7 @@ export function apply(ctx: ClientContext): void {
       store,
       inject: () => ({ ...face, ...capability, hooks: { ...face.hooks, ...capability.hooks } }),
       children: {
+        'capabilities.models': { kind: 'single', scope: 'root' },
         'plugins.item': { kind: 'list', scope: 'root' },
         'plugins.bundle.activation': { kind: 'keyed', scope: 'root' },
         'plugins.bundle.config': { kind: 'keyed', scope: 'root' },

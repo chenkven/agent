@@ -74,6 +74,8 @@ export interface PluginActivationOwnerProps {
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
+    /** Provider and model editor supplied by the Models settings plugin. */
+    'capabilities.models': { kind: 'single'; scope: 'root'; owner: Record<never, never> }
     /** Optional guidance after the user enables a bundle from the list, keyed by npm package name. */
     'plugins.bundle.activation': { kind: 'keyed'; scope: 'root'; owner: PluginActivationOwnerProps }
     /**

@@ -7,6 +7,7 @@ export const INSTALL_PATH_EXAMPLE = '/Users/name/my-plugin'
 
 /** Simplified Chinese dictionary and key source of truth. */
 export const zh = {
+  centerModels: '模型',
   centerAgents: '多 Agent',
   centerAgentHint: '角色保存到当前 Profile。主 Agent 使用 delegate_角色标识 委派任务，子代理拥有独立上下文，继承父会话权限。编辑仅影响后续委派。',
   centerAgentAdd: '添加角色',
@@ -309,6 +310,7 @@ export type PluginManagerLocaleKey = keyof typeof zh
 
 /** English dictionary checked against the Chinese key set. */
 export const en = {
+  centerModels: 'Models',
   centerAgents: 'Multi-Agent',
   centerAgentHint: 'Roles are saved in this profile. The main Agent delegates through delegate_ROLE. Children have independent context and inherit parent permissions. Edits apply to future delegations.',
   centerAgentAdd: 'Add role',

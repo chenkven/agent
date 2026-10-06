@@ -1,6 +1,6 @@
 /** Skill, MCP, Prompt, and plugin management in the Web main panel. */
 import { useEffect, useState, type ReactNode } from 'react'
-import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ManagedMcpConfig } from '@deepseek-ai/dsh-plugin-manager/types'
 import type { PluginManagerPageProps } from './PluginManagerPage.tsx'
 import { PluginManagerPage } from './PluginManagerPage.tsx'
@@ -8,7 +8,7 @@ import { AgentsPanel } from './AgentsPanel.tsx'
 import type { CapabilityFace, CapabilityMcp, CapabilityTab } from './capability-store.ts'
 import css from './CapabilityCenter.module.css'
 
-export type CapabilityCenterProps = PluginManagerPageProps & InjectFace<CapabilityFace>
+export type CapabilityCenterProps = PluginManagerPageProps & InjectFace<CapabilityFace> & PropsRenderSlots<'capabilities.models'>
 
 function objectFields(text: string, errorText: string): Record<string, string> {
   const value: unknown = JSON.parse(text)
@@ -83,18 +83,19 @@ export function CapabilityCenter(props: CapabilityCenterProps): ReactNode {
   const tabs: readonly { id: CapabilityTab; label: string }[] = [
     { id: 'skills', label: t('centerSkills') }, { id: 'mcp', label: t('centerMcp') },
     { id: 'prompts', label: t('centerPrompts') }, { id: 'permissions', label: t('centerPermissions') },
-    { id: 'agents', label: t('centerAgents') }, { id: 'plugins', label: t('centerPlugins') },
+    { id: 'models', label: t('centerModels') }, { id: 'agents', label: t('centerAgents') }, { id: 'plugins', label: t('centerPlugins') },
   ]
   return <section className={css.center} data-capability-center>
     <header className={css.header}>
       <div><h1>{t('centerTitle')}</h1><p>{t('centerIntro')}</p></div>
-      {state.tab === 'plugins' ? null : <button type="button" onClick={props.refreshCapabilities}>{t('refresh')}</button>}
+      {state.tab === 'plugins' || state.tab === 'models' ? null : <button type="button" onClick={props.refreshCapabilities}>{t('refresh')}</button>}
     </header>
     <nav className={css.tabs} aria-label={t('centerTitle')}>
       {tabs.map(item => <button key={item.id} type="button" aria-current={state.tab === item.id ? 'page' : undefined}
         onClick={() =>{  props.selectCapabilityTab(item.id) }}>{item.label}</button>)}
     </nav>
     {state.tab === 'plugins' ? <PluginManagerPage {...props} /> : <div className={css.body}>
+      {state.tab === 'models' ? props.renderSlot('capabilities.models', {}) : null}
       {state.tab === 'agents' ? <AgentsPanel {...props} state={state} /> : null}
       {state.tab === 'permissions' ? <>
         <p className={css.hint}>{t('centerPermissionHint')}</p>

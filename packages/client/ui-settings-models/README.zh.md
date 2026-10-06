@@ -27,6 +27,8 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
+设置和能力中心通过 `settings.models.editor` 插槽 Factory 渲染同一个编辑器。Host 目录和凭据操作共享，表单草稿属于各自挂载的编辑器。Factory 拥有供应商卡片与页脚扩展插槽，因此两个入口收到相同的适配器扩展。公网演示的仅凭据模式同时适用于两个入口。
+
 保存凭据或自定义提供方时保留已选模型。用户可在 composer 中选择可用模型。
 
 提供方列表中 DeepSeek 账号排第一，DeepSeek 排第二；第三方提供方保留目录中的相对顺序。

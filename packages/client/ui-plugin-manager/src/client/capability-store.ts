@@ -42,7 +42,7 @@ export interface CapabilityAgentRun {
 /** One exact route advertised by the Host. */
 export interface CapabilityModel { readonly provider: string; readonly model: string; readonly label: string }
 /** Inventory selected in the capability center. */
-export type CapabilityTab = 'skills' | 'mcp' | 'prompts' | 'plugins' | 'permissions' | 'agents'
+export type CapabilityTab = 'skills' | 'mcp' | 'prompts' | 'plugins' | 'permissions' | 'agents' | 'models'
 
 /** Browser actions backed by the existing Host Remotes. */
 export interface CapabilityServices {
@@ -134,7 +134,7 @@ export class CapabilityController {
   async load(): Promise<void> {
     const generation = ++this.generation
     const { tab } = this.store.getSnapshot()
-    if (tab === 'plugins') { this.patch({ loading: false, error: null }); return }
+    if (tab === 'plugins' || tab === 'models') { this.patch({ loading: false, error: null }); return }
     this.patch({ loading: true, error: null })
     try {
       if (tab === 'skills') {

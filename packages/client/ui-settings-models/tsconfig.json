@@ -8,6 +8,7 @@
     "src"
   ],
   "references": [
+    { "path": "../ui-plugin-manager/tsconfig.client.json" },
     {
       "path": "../../host/webserver"
     },

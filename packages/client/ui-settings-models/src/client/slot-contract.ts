@@ -18,9 +18,22 @@
  */
 
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type { ModelsSectionInjected } from './ModelsSection.tsx'
 import type { ProviderDirectoryEntry } from './store.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotFactoryMap {
+    /** Shared Models editor, with independent drafts and one Host-backed store. */
+    'settings.models.editor': {
+      scope: 'root'
+      inject: ModelsSectionInjected
+      children: {
+        'settings.models.provider-card': { kind: 'keyed'; scope: 'root' }
+        'settings.models.footer': { kind: 'list'; scope: 'root' }
+      }
+    }
+  }
+
   interface SlotMap {
     /**
      * One provider card's adapter extension area, dispatched with
