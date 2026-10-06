@@ -1,12 +1,50 @@
 /** Session-addressed, cold-readable skill catalog Remote. */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { readFile, realpath } from 'node:fs/promises'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import type {} from '@deepseek-ai/dsh-agent-preset-registry/types'
+import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { SessionQueryError } from '@deepseek-ai/dsh-session-query'
 import { isUserInvocable } from '@deepseek-ai/dsh-skill'
+import type { SkillSummary } from '@deepseek-ai/dsh-skill'
 import type { ScopeKey } from '@deepseek-ai/dsh-scope'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import type { SkillListRequest, SkillListValue } from './types.ts'
+import { isMap, parseDocument } from 'yaml'
+import type { SkillInvocationChange, SkillListRequest, SkillListValue, SkillManagementEntry, SkillManagementValue } from './types.ts'
+
+function projectSkillRoot(cwd: string, source: string): string | undefined {
+  if (source === 'project-dsh') return resolve(cwd, '.dsh/skills')
+  if (source === 'project-agents') return resolve(cwd, '.agents/skills')
+  return undefined
+}
+
+async function editableSkill(cwd: string, skill: SkillSummary): Promise<boolean> {
+  if (projectSkillRoot(cwd, skill.source) === undefined || skill.path === undefined) return false
+  try {
+    const realCwd = await realpath(cwd)
+    const root = projectSkillRoot(realCwd, skill.source)
+    if (root === undefined) return false
+    const [realRoot, realFile] = await Promise.all([realpath(root), realpath(skill.path)])
+    if (relative(root, realRoot) !== '') return false
+    const inside = relative(realRoot, realFile)
+    return inside !== '' && inside !== '..' && !inside.startsWith(`..${sep}`) && !isAbsolute(inside)
+  } catch { return false }
+}
+
+/** Replace only invocation keys in a project-owned SKILL.md frontmatter. */
+async function writeSkillInvocation(path: string, change: SkillInvocationChange): Promise<void> {
+  const content = await readFile(path, 'utf8')
+  const match = /^(---\r?\n)([\s\S]*?)(\r?\n---\r?\n)/.exec(content)
+  if (match === null || match[2] === undefined) throw new Error('Skill file has no YAML frontmatter')
+  const document = parseDocument(match[2])
+  if (document.errors[0] !== undefined) throw document.errors[0]
+  if (!isMap(document.contents)) throw new Error('Skill frontmatter must be a YAML mapping')
+  if (document.get('name') !== change.name) throw new Error('Skill identity changed during editing')
+  document.set('disable-model-invocation', !change.modelInvocable)
+  document.set('user-invocable', change.userInvocable)
+  await writeFileAtomic(path, `${match[1]}${String(document).trimEnd()}${match[3]}${content.slice(match[0].length)}`, { mode: 0o600 })
+}
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -33,6 +71,49 @@ export class SessionSkillCatalog extends TypertRemoteService {
    */
   @Remote
   async list(request: SkillListRequest, signal: AbortSignal): Promise<SkillListValue> {
+    const { skills } = await this.observe(request, signal)
+    return { skills: skills.filter(isUserInvocable).map(skill => ({
+      name: skill.name,
+      ...skill.path === undefined ? {} : { path: skill.path },
+      description: skill.description,
+      ...skill.whenToUse === undefined ? {} : { whenToUse: skill.whenToUse },
+      modelInvocable: skill.invocation.modelInvocable,
+    })) }
+  }
+
+  /** Inventory every skill visible to a Session, including those disabled for user invocation. */
+  @Remote
+  async manageList(request: SkillListRequest, signal: AbortSignal): Promise<SkillManagementValue> {
+    const { skills, cwd } = await this.observe(request, signal)
+    return { skills: await Promise.all(skills.map(async (skill): Promise<SkillManagementEntry> => ({
+      name: skill.name,
+      ...skill.path === undefined ? {} : { path: skill.path },
+      description: skill.description,
+      ...skill.whenToUse === undefined ? {} : { whenToUse: skill.whenToUse },
+      modelInvocable: skill.invocation.modelInvocable,
+      userInvocable: skill.invocation.userInvocable,
+      source: skill.source,
+      editable: await editableSkill(cwd, skill),
+    }))) }
+  }
+
+  /** Edit invocation flags only for a winning Skill file inside this Session's project skill roots. */
+  @Remote
+  async setInvocation(change: SkillInvocationChange, signal: AbortSignal): Promise<void> {
+    const { skills, cwd, registry } = await this.observe(change, signal)
+    const skill = skills.find(row => row.name === change.name)
+    const path = skill?.path
+    if (skill === undefined || path === undefined || !(await editableSkill(cwd, skill))) {
+      throw new RemoteError('gateway/internal', `skill "${change.name}" is not an editable project skill`, {})
+    }
+    await withFileLock(path, async () => {
+      if (!(await editableSkill(cwd, skill))) throw new Error('Skill source moved outside the project')
+      await writeSkillInvocation(path, change)
+    })
+    registry.invalidateCatalog()
+  }
+
+  private async observe(request: SkillListRequest, signal: AbortSignal) {
     void signal
     const { sessionId } = request
     let cwd: string | undefined
@@ -74,16 +155,7 @@ export class SessionSkillCatalog extends TypertRemoteService {
     await using lease = live === undefined ? await this.scopeFor(agentPreset) : undefined
     const scope = live ?? lease?.key
     try {
-      const skills = (await skillRegistry.list({ cwd, scope })).filter(isUserInvocable)
-      return {
-        skills: skills.map(skill => ({
-          name: skill.name,
-          ...skill.path === undefined ? {} : { path: skill.path },
-          description: skill.description,
-          ...skill.whenToUse === undefined ? {} : { whenToUse: skill.whenToUse },
-          modelInvocable: skill.invocation.modelInvocable,
-        })),
-      }
+      return { skills: await skillRegistry.list({ cwd, scope }), cwd, registry: skillRegistry }
     } catch (error: unknown) {
       throw new RemoteError('gateway/internal', `skill listing failed: ${String(error)}`, {})
     }

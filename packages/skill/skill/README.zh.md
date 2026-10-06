@@ -25,6 +25,8 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
+受信任的 Host 编辑器修改提供方源文件后，可调用 `invalidateCatalog()` 立即丢弃发现缓存。下一次 `list()` 或 `get()` 会读取新的调用策略；普通文件系统监听器仍负责外部编辑的失效通知。
+
 挂载插件即可让组合拥有一个统一的 skill 注册表。skill 来源（提供方）和消费方（面向模型的目录与 loader，或你自己的代码）都通过 `ctx.skills` 交互；注册表合并任意提供方报告的一切内容，因此一次查找就能看到所有来源的 skill。
 
 ### 何时选择

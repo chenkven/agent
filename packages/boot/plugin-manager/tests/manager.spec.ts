@@ -431,6 +431,24 @@ it('turns a plugin off and on without duplicating patch overrides', async () => 
   expect(readFileSync(join(dir, 'cordis.patch.yml'), 'utf8').match(/id: managed/g)).toHaveLength(1)
 })
 
+it('saves profile MCP connections disabled and rejects duplicate namespaces and invalid inputs', async () => {
+  const { manager, dir } = await fixture('startup')
+  const config = { serverName: 'local_docs', transport: 'streamable-http' as const,
+    url: 'https://example.com/mcp', headers: {} }
+  expect(await manager.saveManagedMcpServer(config)).toMatchObject({ changed: true, application: 'restart-required' })
+  const [saved] = await manager.listManagedMcpServers()
+  expect(saved).toMatchObject({ enabled: false, config })
+  expect(await manager.saveManagedMcpServer(config)).toMatchObject({ changed: false, application: 'failed', error: { code: 'duplicate-mcp' } })
+  expect(await manager.saveManagedMcpServer({ ...config, url: 'file:///invalid' }, saved!.id))
+    .toMatchObject({ changed: false, application: 'failed', error: { code: 'invalid-mcp' } })
+  expect(await manager.saveManagedMcpServer({ ...config, url: 'https://example.com/next' }, saved!.id))
+    .toMatchObject({ changed: true, application: 'restart-required' })
+  expect((await manager.listManagedMcpServers())[0]?.config).toMatchObject({ url: 'https://example.com/next' })
+  expect(await manager.removeManagedMcpServer(saved!.id)).toMatchObject({ changed: true, application: 'restart-required' })
+  expect(await manager.listManagedMcpServers()).toEqual([])
+  expect(readFileSync(join(dir, 'cordis.patch.yml'), 'utf8')).not.toContain(saved!.id)
+})
+
 it('retains installed dependencies when toggling a bundle and appends it when re-enabled', async () => {
   const { manager, dir, bundle } = await fixture()
   bundle('third', [])

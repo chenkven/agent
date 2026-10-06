@@ -28,6 +28,8 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
+能力中心还通过 `listManagedMcpServers`、`saveManagedMcpServer` 和 `removeManagedMcpServer` 管理当前 profile 的 `cordis.patch.yml` 中专用的 `@deepseek-ai/dsh-mcp-client` 行。新行默认停用。Host 校验命名空间、连接方式、地址或命令、参数与映射大小，并检查组合后的 profile 是否已有同名服务。编辑时保留原有启停状态；删除时清理该行及其启停覆盖，不删除组合包或其他配置层提供的行。HTTP 请求头和 stdio 环境变量保存在 profile patch 中；其中含有凭据时，应把该文件视为敏感文件。更改使用 profile 文件锁及现有 HMR 重组路径；仅启动时加载的 profile 需要重启。
+
 基于 base 的 profile 提供管理服务。在 Web 中，侧边栏的**插件**页（[ui-plugin-manager](../../client/ui-plugin-manager/README.zh.md)）管理 profile 的组合包及其能唯一定位的行；设置页的插件列表保持只读。Agent 预设条目保持只读。`plugin_manager` 工具提供相同操作，在 Creator 模式中启用。其他预设仍默认禁用。 每个工具操作都要求 `danger-full-access` 或本次调用的批准。在较低沙箱模式下，`ask` 会请求审批；`never`、拒绝、取消或审批渠道不可用时均不执行。批准不改变会话的权限模式。profile 变更跨会话持久化，已安装的 Host 代码在宿主进程内运行，不受工作区沙箱限制。依赖构建脚本仍需单独批准。
 
 未使用 Agent 预设的部署在 profile patch 中启用工具；使用预设的会话由其预设中的 `tool-plugin-manager` 条目控制。

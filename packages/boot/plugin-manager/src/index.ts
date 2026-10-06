@@ -23,13 +23,14 @@ import { bundleManifest, readProfileRegistry, registryArguments, runProfilePnpm,
 import { classifyInstallFailure } from './install-failure.ts'
 import { InvalidInstallSpecError, parseInstallSpec, type ParsedInstallSpec } from './install-spec.ts'
 import { attributeFailure, normalizeRegistry, NPMMIRROR_REGISTRY, registryPlan } from './registry.ts'
-import { writePluginEnabled } from './patch.ts'
+import { readManagedMcpServers, writeManagedMcpServer, writePluginEnabled } from './patch.ts'
 import { incompatiblePlugin, ManagementFailure } from './failure.ts'
 import { approveBuilds, readPendingBuilds } from './build-approval.ts'
 import { checkGithubConnection } from './github-connection.ts'
 import type {
   BundleInfo, BundleRowInfo, ChangeResult, InspectOptions, InstallBundleOptions, ManagementError, PackageResult, PluginChange,
   PluginEntryId, PluginInfo, PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress, PluginInstallRequestId,
+  ManagedMcpConfig, ManagedMcpServer,
   PluginRegistries, PluginSpecInspection, Registry,
 } from './types.ts'
 export type * from './types.ts'
@@ -62,6 +63,34 @@ export interface Config {
 
 /** An http(s) URL, as pnpm's `--registry` takes it. */
 const REGISTRY_URL = /^https?:\/\/\S+$/
+
+function validateMcpConfig(input: ManagedMcpConfig): ManagedMcpConfig {
+  if (typeof input !== 'object' || input === null || typeof input.serverName !== 'string'
+    || !/^[A-Za-z0-9_-]{1,32}$/.test(input.serverName)) throw new ManagementFailure('invalid-mcp')
+  if (input.transport === 'streamable-http') {
+    if (typeof input.url !== 'string' || input.url.length > 2048) throw new ManagementFailure('invalid-mcp')
+    let url: URL
+    try { url = new URL(input.url) } catch { throw new ManagementFailure('invalid-mcp') }
+    if (!['http:', 'https:'].includes(url.protocol) || url.username !== '' || url.password !== '') throw new ManagementFailure('invalid-mcp')
+    if (typeof input.headers !== 'object' || input.headers === null || Array.isArray(input.headers)
+      || Object.entries(input.headers).length > 32 || Object.entries(input.headers).some(([key, value]) =>
+      !/^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}$/.test(key) || typeof value !== 'string' || value.length > 4096)) {
+      throw new ManagementFailure('invalid-mcp')
+    }
+    return { serverName: input.serverName, transport: input.transport, url: input.url, headers: input.headers }
+  }
+  if (input.transport !== 'stdio' || typeof input.command !== 'string' || input.command.trim() === ''
+    || input.command.length > 1024 || !Array.isArray(input.args) || input.args.length > 64
+    || input.args.some(arg => typeof arg !== 'string' || arg.length > 4096)
+    || typeof input.cwd !== 'string' || input.cwd.length > 2048
+    || typeof input.env !== 'object' || input.env === null || Array.isArray(input.env)
+    || Object.entries(input.env).length > 64 || Object.entries(input.env).some(([key, value]) =>
+    !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || typeof value !== 'string' || value.length > 4096)) {
+    throw new ManagementFailure('invalid-mcp')
+  }
+  return { serverName: input.serverName, transport: input.transport, command: input.command,
+    args: input.args, env: input.env, cwd: input.cwd }
+}
 
 const protectedModules = new Set([
   '@deepseek-ai/dsh-plugin-manager', '@deepseek-ai/cordis-plugin-loader',
@@ -432,6 +461,42 @@ export class PluginManager extends TypertRemoteService {
       const current = (await this.listPlugins()).find(item => item.entryId === id)
       return current?.enabled !== enabled && this.ownerContext.get('hmr') !== undefined ? 'overridden' : undefined
     }), { stage: 'enable', target: id, enabled }, 'plugin')
+  }
+
+  /** List connections created in the capability center. Other MCP entries remain visible through listPlugins. */
+  @Remote
+  listManagedMcpServers(): Promise<ManagedMcpServer[]> {
+    return readManagedMcpServers(this.profile.patchPath)
+  }
+
+  /** Create or update one profile-wide MCP connection. A new row starts disabled until explicitly enabled. */
+  @Remote
+  saveManagedMcpServer(input: ManagedMcpConfig, id?: string): Promise<ChangeResult> {
+    return this.change(result => this.configure(async () => {
+      const config = validateMcpConfig(input)
+      const owned = await this.listManagedMcpServers()
+      if (id !== undefined && !owned.some(row => row.id === id)) throw new ManagementFailure('unknown-mcp')
+      const target = id ?? `capability-mcp-${randomUUID()}`
+      const rows = flatten(composeEntries([readProfilePatches('dsh', this.profile)]))
+      if (rows.some(row => row.id === target && id === undefined)) throw new ManagementFailure('duplicate-mcp')
+      if (rows.some(row => row.id !== target && row.name === '@deepseek-ai/dsh-mcp-client'
+        && typeof row.config === 'object' && row.config !== null
+        && (row.config as { serverName?: unknown }).serverName === config.serverName)) {
+        throw new ManagementFailure('duplicate-mcp')
+      }
+      await writeManagedMcpServer(this.profile.patchPath, target, config)
+      result.warnings = await this.reload(id === undefined ? [] : [target])
+    }), { stage: 'enable', target: id ?? input?.serverName ?? '', enabled: false }, 'plugin')
+  }
+
+  /** Remove only a capability-center-owned MCP connection from the profile patch. */
+  @Remote
+  removeManagedMcpServer(id: string): Promise<ChangeResult> {
+    return this.change(result => this.configure(async () => {
+      if (!(await this.listManagedMcpServers()).some(row => row.id === id)) throw new ManagementFailure('unknown-mcp')
+      await writeManagedMcpServer(this.profile.patchPath, id)
+      result.warnings = await this.reload()
+    }), { stage: 'remove', target: id }, 'plugin')
   }
 
   /** Select or remove a bundle layer while retaining installed dependencies.

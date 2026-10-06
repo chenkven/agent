@@ -1,10 +1,13 @@
 import { Context } from '@deepseek-ai/cordis'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset } from '@deepseek-ai/dsh-session'
 import { SessionQueryError, type SessionObservation } from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-skill'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { SessionSkillCatalog } from '../src/skill-catalog.ts'
 
 function observation(
@@ -44,6 +47,36 @@ async function context(): Promise<Context> {
 }
 
 describe('SessionSkillCatalog', () => {
+  it('shows disabled skills and edits only a project-owned Skill file', async () => {
+    const cwd = await mkdtemp(join(tmpdir(), 'session-skill-manage-'))
+    onTestFinished(() => rm(cwd, { recursive: true, force: true }))
+    const root = join(cwd, '.agents', 'skills', 'review')
+    await mkdir(root, { recursive: true })
+    const path = join(root, 'SKILL.md')
+    await writeFile(path, '---\nname: review\ndescription: Review files\n---\n\nInstructions.\n')
+    const ctx = await context()
+    const sessionId = SessionId('editable-skill')
+    ctx.provide('sessionQuery', { observeSession: () => Promise.resolve(observation(sessionId, { cwd })) } as never)
+    const invalidateCatalog = vi.fn()
+    ctx.provide('skills', { list: async () => [{ name: 'review', description: 'Review files', path,
+      source: 'project-agents', invocation: { modelInvocable: true, userInvocable: true } },
+    { name: 'bundle', description: 'Packaged', path: join(cwd, 'bundle.md'), source: 'bundled',
+      invocation: { modelInvocable: true, userInvocable: false } }], invalidateCatalog } as never)
+    const catalog = new SessionSkillCatalog(ctx)
+    const before = await catalog.manageList({ sessionId }, new AbortController().signal)
+    expect(before.skills).toMatchObject([
+      { name: 'review', editable: true, userInvocable: true },
+      { name: 'bundle', editable: false, userInvocable: false },
+    ])
+    await catalog.setInvocation({ sessionId, name: 'review', modelInvocable: false, userInvocable: false }, new AbortController().signal)
+    const edited = await readFile(path, 'utf8')
+    expect(edited).toContain('disable-model-invocation: true')
+    expect(edited).toContain('user-invocable: false')
+    expect(edited).toContain('Instructions.')
+    expect(invalidateCatalog).toHaveBeenCalledOnce()
+    await expect(catalog.setInvocation({ sessionId, name: 'bundle', modelInvocable: false, userInvocable: false },
+      new AbortController().signal)).rejects.toThrow('not an editable project skill')
+  })
   it('reads a cold Session catalog without resuming an Agent', async () => {
     const ctx = await context()
     const sessionId = SessionId('cold-skills')

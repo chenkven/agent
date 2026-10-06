@@ -260,6 +260,24 @@ export interface SkillListValue {
   readonly skills: readonly SkillEntry[]
 }
 
+/** Invocation-neutral skill inventory for the capability center. */
+export interface SkillManagementEntry extends SkillEntry {
+  readonly userInvocable: boolean
+  readonly source: string
+  /** Only source files inside this Session's project skill roots can be edited here. */
+  readonly editable: boolean
+}
+
+export interface SkillManagementValue {
+  readonly skills: readonly SkillManagementEntry[]
+}
+
+export interface SkillInvocationChange extends SkillListRequest {
+  readonly name: string
+  readonly modelInvocable: boolean
+  readonly userInvocable: boolean
+}
+
 /** Session list request. */
 export interface SessionListRequest {
   readonly cursor?: string

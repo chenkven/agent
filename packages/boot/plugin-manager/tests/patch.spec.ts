@@ -5,7 +5,28 @@ import { tmpdir } from 'node:os'
 import { expect, it, onTestFinished } from 'vitest'
 import { applyEntryPatches } from '@deepseek-ai/cordis-plugin-include'
 import { loadOptionalPatches } from '@deepseek-ai/dsh-app-boot'
-import { writePluginEnabled } from '../src/patch.ts'
+import { readManagedMcpServers, writeManagedMcpServer, writePluginEnabled } from '../src/patch.ts'
+
+it('round-trips a disabled MCP server without replacing unrelated profile configuration', async () => {
+  const file = await fixture('# user configuration\n- id: unrelated\n  disabled: false # keep\n')
+  const id = 'capability-mcp-test'
+  const config = { serverName: 'test', transport: 'streamable-http' as const,
+    url: 'http://127.0.0.1:3000/mcp', headers: { Authorization: 'Bearer secret' } }
+  await writeManagedMcpServer(file, id, config)
+  expect(await readManagedMcpServers(file)).toEqual([{ id, enabled: false, config }])
+  expect(loadOptionalPatches('test', file)).toMatchObject([
+    { id: 'unrelated', disabled: false },
+    { insert: [{ id, name: '@deepseek-ai/dsh-mcp-client', disabled: true, config }] },
+  ])
+  await writePluginEnabled(file, id, '@deepseek-ai/dsh-mcp-client', true)
+  await writeManagedMcpServer(file, id, { ...config, url: 'https://example.com/mcp' })
+  expect(loadOptionalPatches('test', file)?.at(-1)).toEqual({ id, disabled: false })
+  expect((await readManagedMcpServers(file))[0]?.enabled).toBe(true)
+  await writeManagedMcpServer(file, id)
+  expect(await readManagedMcpServers(file)).toEqual([])
+  expect(await readFile(file, 'utf8')).toContain('# keep')
+  expect(loadOptionalPatches('test', file)).toEqual([{ id: 'unrelated', disabled: false }])
+})
 
 async function fixture(text?: string): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'manager-patch-'))

@@ -471,6 +471,9 @@ export class SkillRegistry extends Service {
     return (await this.snapshot(options)).skills
   }
 
+  /** Discard cached discovery after a trusted Host editor changes a provider's source file. */
+  invalidateCatalog(): void { this.invalidateCache() }
+
   /**
    * Observe the current invocation-neutral catalog and whether discovery completed within a stable revision.
    * Incomplete observations are never cached, allowing consumers to retain last-good state and

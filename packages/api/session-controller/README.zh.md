@@ -27,6 +27,8 @@ kind: "package-reference"
 <a id="use-this-package"></a>
 ## 使用本包
 
+`skills.manageList` Remote 返回会话的完整 Skill 目录，包括在任一调用界面停用的 Skill。它解析真实路径，仅将项目 `.dsh/skills` 和 `.agents/skills` 下的文件标记为可编辑。`skills.setInvocation` 原子更新这些文件 YAML frontmatter 中的两个调用开关，并使注册表的发现缓存失效；随包、用户目录、符号链接指向项目外以及虚拟 Skill 均被拒绝。现有 `skills.list` 仍只返回用户可调用的 Skill，供聊天命令使用。
+
 历史页与 follow opening 快照为每个持久 Session 事件携带一条 `{ type: 'event', event: SessionWireEvent }` record。Client 把每条已接受 record 保留为一个持久 `SessionEventLikeEntry`；Assistant token 边界保留在 `assistant/message` 或 `assistant/attempt` 的紧凑流内。工具参数、结果内容、失败信息和 `tool/result.data.meta` 原样通过；控制器不解析工具定义、不运行展示转换器，也不附加 UI 数据。
 
 Client journal 在发布 follow 快照、live entry 或历史页之前验证当前 Session 事件 envelope。它复用浏览器安全的 Session validator，检查必需的 surface marker、精确的 replacement endpoint、更早且唯一的 source seq、内嵌 Assistant 提供方元数据、request header 可选字段的省略规则以及工具错误一致性。无效 record 直接失败，不删除字段或归一化；范围成员与来源存在性仍由 Host 的持久日志检查。
