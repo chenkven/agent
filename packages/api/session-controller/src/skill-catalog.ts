@@ -81,7 +81,12 @@ export class SessionSkillCatalog extends TypertRemoteService {
     })) }
   }
 
-  /** Inventory every skill visible to a Session, including those disabled for user invocation. */
+  /**
+   * Inventory every skill visible to a Session, including those disabled for user invocation.
+   * @param request - Session whose winning Skill catalog is inspected.
+   * @param signal - caller cancellation signal.
+   * @returns inventory with source ownership and editability.
+   */
   @Remote
   async manageList(request: SkillListRequest, signal: AbortSignal): Promise<SkillManagementValue> {
     const { skills, cwd } = await this.observe(request, signal)
@@ -97,7 +102,11 @@ export class SessionSkillCatalog extends TypertRemoteService {
     }))) }
   }
 
-  /** Edit invocation flags only for a winning Skill file inside this Session's project skill roots. */
+  /**
+   * Edit invocation flags only for a winning Skill file inside this Session's project skill roots.
+   * @param change - Session, Skill name, and invocation flags to persist.
+   * @param signal - caller cancellation signal.
+   */
   @Remote
   async setInvocation(change: SkillInvocationChange, signal: AbortSignal): Promise<void> {
     const { skills, cwd, registry } = await this.observe(change, signal)

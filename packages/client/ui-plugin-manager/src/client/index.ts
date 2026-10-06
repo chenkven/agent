@@ -9,11 +9,13 @@
 import type {} from '@deepseek-ai/dsh-client-product-analytics/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 // Type-only: the root `main` keyed slot the page registers into, declared by
 // ui-layout with the panel id brand, and the `sidebar.panellist` list the
 // entry registers into, declared by ui-sidebar.
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: the ctx.remote Context merge and the forwarded-event key face.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
@@ -69,7 +71,7 @@ export const PANEL_ID = 'plugins' as MainPanelId
 /** Services required by the sidebar registration and the Remote methods; the inventory says whether the Host manages a profile. */
 export const inject = [
   'slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe',
-  'remote.skills', 'remote.agentPresets', 'remote.settings', 'remote.permissionPresets', 'remote.session', 'remote.commands', 'sessions', 'configForms', 'layout',
+  'remote.skills', 'remote.agentPresets', 'remote.settings', 'remote.permissionPresets', 'remote.session', 'remote.commands', 'sessions', 'configForms', 'layout', 'uiWorkspace',
 ]
 
 /**
@@ -106,6 +108,7 @@ export function apply(ctx: ClientContext): void {
   const face = controller.inject(configLedger, text => ctx.locale.resolveText(text))
   const sessionChoices = (snapshot: ReturnType<typeof ctx.sessions.list.getSnapshot>) =>
     Object.values(snapshot.byId)
+      .filter(row => row.origin !== 'subagent')
       .sort((a, b) => Number(a.blank) - Number(b.blank) || b.updatedAt - a.updatedAt)
       .map(row => ({ id: row.id as string, title: row.displayTitle }))
   let lastSessions = ctx.sessions.list.getSnapshot()
@@ -144,7 +147,7 @@ export function apply(ctx: ClientContext): void {
       const visible = plugins.value.filter(row => row.moduleName === '@deepseek-ai/dsh-mcp-client').map((row) => {
         const configured = row.patchId === undefined ? undefined : owned.get(row.patchId)
         return {
-          id: row.entryId as string, name: configured?.config.serverName ?? row.patchId ?? row.entryId as string,
+          id: row.entryId, name: configured?.config.serverName ?? row.patchId ?? row.entryId,
           enabled: row.enabled, phase: row.fiberPhase, readOnly: row.readOnlyReason !== undefined,
           ...configured === undefined ? {} : { managedId: configured.id, config: configured.config },
         }
@@ -181,6 +184,63 @@ export function apply(ctx: ClientContext): void {
       }
       return result.value.application === 'restart-required' ? 'restart-required' : 'applied'
     },
+    agents: async () => {
+      const [roles, plugins] = await Promise.all([ctx.remote.pluginManager.agentList(), ctx.remote.pluginManager.listPlugins()])
+      if (!roles.ok) throw new Error(roles.error.message)
+      if (!plugins.ok) throw new Error(plugins.error.message)
+      return roles.value.map((role) => {
+        const plugin = plugins.value.find(row => row.patchId === role.id)
+        return { ...role, phase: plugin?.fiberPhase ?? null,
+          ...plugin === undefined ? {} : { entryId: plugin.entryId },
+        }
+      })
+    },
+    models: async () => {
+      const catalog = await ctx.remote.session.modelCatalog()
+      if (!catalog.ok) throw new Error(catalog.error.message)
+      return catalog.value.groups.flatMap(group => group.models.map(model => ({
+        provider: group.id, model: model.id, label: `${group.name} / ${model.name}`,
+      })))
+    },
+    agentRuns: async (sessionId) => {
+      if (sessionId === undefined) return []
+      const projection = await ctx.remote.session.projections({
+        sessionId: sessionId as Parameters<typeof ctx.remote.session.projections>[0]['sessionId'],
+      })
+      if (!projection.ok) throw new Error(projection.error.message)
+      return (projection.value?.values.subagentCatalog ?? []).slice(-50).map(row => ({
+        id: row.id as string, parentId: sessionId, mode: row.mode, label: row.label ?? row.id as string,
+        running: ctx.sessions.list.getSnapshot().byId[row.id]?.running === true,
+      }))
+    },
+    saveAgent: async (config, id) => {
+      const result = await ctx.remote.pluginManager.agentSave(config, id)
+      if (!result.ok) throw new Error(result.error.message)
+      if (result.value.application === 'failed' || result.value.application === 'overridden') {
+        throw new Error(result.value.error?.diagnostic ?? result.value.error?.code ?? result.value.application)
+      }
+      return result.value.application === 'restart-required' ? 'restart-required' : 'applied'
+    },
+    removeAgent: async (id) => {
+      const result = await ctx.remote.pluginManager.agentDelete(id)
+      if (!result.ok) throw new Error(result.error.message)
+      if (result.value.application === 'failed' || result.value.application === 'overridden') {
+        throw new Error(result.value.error?.diagnostic ?? result.value.error?.code ?? result.value.application)
+      }
+      return result.value.application === 'restart-required' ? 'restart-required' : 'applied'
+    },
+    delegateAgent: async (sessionId, name, task) => {
+      const result = await ctx.remote.session.prompt({
+        requestId: randomUUID() as Parameters<typeof ctx.remote.session.prompt>[0]['requestId'],
+        sessionId: sessionId as Parameters<typeof ctx.remote.session.prompt>[0]['sessionId'], mode: 'queue',
+        content: [{ type: 'text', text: `Delegate this task to the delegate_${name} tool and summarize its result:\n${task}` }],
+      })
+      if (!result.ok) throw new Error(result.error.message)
+    },
+    openAgentRun: (run) =>{  ctx.uiWorkspace.openSession({
+      parentSessionId: run.parentId as Parameters<typeof ctx.remote.session.projections>[0]['sessionId'],
+      childSessionId: run.id as Parameters<typeof ctx.remote.session.projections>[0]['sessionId'], mode: run.mode,
+    }) },
     permissions: async (sessionId) => {
       const catalog = await ctx.remote.permissionPresets.catalog()
       if (!catalog.ok) throw new Error(catalog.error.message)
@@ -234,7 +294,7 @@ export function apply(ctx: ClientContext): void {
   }
   const capabilityController = new CapabilityController(capabilityServices)
   const capability = capabilityFace(capabilityController)
-  ctx.effect(() => () => capabilityController.dispose(), 'ui-plugin-manager: capability inventory')
+  ctx.effect(() => () =>{  capabilityController.dispose() }, 'ui-plugin-manager: capability inventory')
   ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay', id: 'plugin-manager.refresh-toast', locale: NS,
     inject: (): PluginRefreshToastFace => ({

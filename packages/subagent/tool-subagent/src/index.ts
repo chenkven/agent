@@ -53,6 +53,8 @@ export interface Config {
    * a distinct name.
    */
   toolName?: string
+  /** Role purpose appended to the delegation tool description. */
+  description?: string
   /**
    * Sample the Host `subagent-model-selection` setting for each new top-level
    * Session and inherit that decision in its child Sessions.
@@ -106,6 +108,7 @@ export interface Config {
 export const Config: z<Config> = z.object({
   provider: z.string().required(),
   toolName: z.string().default('subagent'),
+  description: z.string(),
   modelSelectionSettings: z.boolean().default(false),
   enableRunInBackground: z.boolean().default(true),
   backgroundMode: z.union(['one-shot', 'continuable'] as const).default('one-shot'),
@@ -378,7 +381,7 @@ export function apply(ctx: Context, config: Config, session?: Session): void {
             : '')
       const disposeTool = runtimeCtx.tools.register(defineTool({
         name: toolName,
-        description: wording.description + (backgroundEnabled
+        description: wording.description + (config.description === undefined ? '' : ` Role: ${config.description}`) + (backgroundEnabled
           // The completion notice is the continuation service's own behavior, not
           // a separately installed capability, so this promise holds whenever the
           // continuable background path is reachable at all.

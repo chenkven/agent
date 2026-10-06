@@ -57,6 +57,7 @@ async function bench() {
   const selectPanel = vi.fn<ILayout['selectPanel']>((activePanelId) => { panelInfo.set({ activePanelId }) })
   ctx.provide('layout', { panelInfo, selectPanel, beginNavigation: () => new AbortController().signal,
     toggleSidebar: vi.fn(), openRightbar: vi.fn(), closeRightbar: vi.fn() })
+  ctx.provide('uiWorkspace', { openSession: vi.fn() })
   ctx.provide('sessions', { list: createSnapshotStore({ byId: {} }) })
   await ctx.plugin(settings).await()
   return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, list, remote, selectPanel, panelInfo }
@@ -132,7 +133,7 @@ describe('ui-plugin-manager browser plugin', () => {
   it('declares only the services the page and its Remote methods use', () => {
     expect(inject).toEqual([
       'slots', 'locale', 'remote', 'remote.pluginManager', 'remote.pluginInventory', 'remote.pluginRegistryProbe',
-      'remote.skills', 'remote.agentPresets', 'remote.settings', 'remote.permissionPresets', 'remote.session', 'remote.commands', 'sessions', 'configForms', 'layout',
+      'remote.skills', 'remote.agentPresets', 'remote.settings', 'remote.permissionPresets', 'remote.session', 'remote.commands', 'sessions', 'configForms', 'layout', 'uiWorkspace',
     ])
   })
 

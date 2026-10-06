@@ -4,6 +4,7 @@ import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ManagedMcpConfig } from '@deepseek-ai/dsh-plugin-manager/types'
 import type { PluginManagerPageProps } from './PluginManagerPage.tsx'
 import { PluginManagerPage } from './PluginManagerPage.tsx'
+import { AgentsPanel } from './AgentsPanel.tsx'
 import type { CapabilityFace, CapabilityMcp, CapabilityTab } from './capability-store.ts'
 import css from './CapabilityCenter.module.css'
 
@@ -48,19 +49,19 @@ function McpEditor({ row, t, busy, onCancel, onSave }: {
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
   }}>
     <h2>{t(row === undefined ? 'centerAddMcp' : 'centerEditMcp')}</h2>
-    <label>{t('centerServerName')}<input required maxLength={32} pattern="[A-Za-z0-9_-]+" value={name} onChange={event => setName(event.target.value)} /></label>
-    <label>{t('centerTransport')}<select value={transport} onChange={event => setTransport(event.target.value as typeof transport)}>
+    <label>{t('centerServerName')}<input required maxLength={32} pattern="[A-Za-z0-9_-]+" value={name} onChange={(event) =>{  setName(event.target.value) }} /></label>
+    <label>{t('centerTransport')}<select value={transport} onChange={(event) =>{  setTransport(event.target.value as typeof transport) }}>
       <option value="streamable-http">{t('centerHttpTransport')}</option><option value="stdio">{t('centerStdioTransport')}</option>
     </select></label>
     {transport === 'streamable-http' ? <>
-      <label>{t('centerUrl')}<input required type="url" value={url} onChange={event => setUrl(event.target.value)} placeholder={t('centerUrlPlaceholder')} /></label>
-      <label>{t('centerHeaders')}<textarea spellCheck={false} value={headers} onChange={event => setHeaders(event.target.value)} /></label>
+      <label>{t('centerUrl')}<input required type="url" value={url} onChange={(event) =>{  setUrl(event.target.value) }} placeholder={t('centerUrlPlaceholder')} /></label>
+      <label>{t('centerHeaders')}<textarea spellCheck={false} value={headers} onChange={(event) =>{  setHeaders(event.target.value) }} /></label>
     </> : <>
       <p className={css.hint}>{t('centerStdioWarning')}</p>
-      <label>{t('centerCommand')}<input required value={command} onChange={event => setCommand(event.target.value)} /></label>
-      <label>{t('centerArgs')}<textarea spellCheck={false} value={args} onChange={event => setArgs(event.target.value)} /></label>
-      <label>{t('centerEnv')}<textarea spellCheck={false} value={env} onChange={event => setEnv(event.target.value)} /></label>
-      <label>{t('centerCwd')}<input value={cwd} onChange={event => setCwd(event.target.value)} /></label>
+      <label>{t('centerCommand')}<input required value={command} onChange={(event) =>{  setCommand(event.target.value) }} /></label>
+      <label>{t('centerArgs')}<textarea spellCheck={false} value={args} onChange={(event) =>{  setArgs(event.target.value) }} /></label>
+      <label>{t('centerEnv')}<textarea spellCheck={false} value={env} onChange={(event) =>{  setEnv(event.target.value) }} /></label>
+      <label>{t('centerCwd')}<input value={cwd} onChange={(event) =>{  setCwd(event.target.value) }} /></label>
     </>}
     {error === null ? null : <p role="alert" className={css.error}>{t('centerInvalidJson')}: {error}</p>}
     <div className={css.actions}><button type="submit" disabled={busy}>{t('centerSaveMcp')}</button>
@@ -81,7 +82,8 @@ export function CapabilityCenter(props: CapabilityCenterProps): ReactNode {
   const selectedSession = state.sessions.find(row => row.id === sessionId)
   const tabs: readonly { id: CapabilityTab; label: string }[] = [
     { id: 'skills', label: t('centerSkills') }, { id: 'mcp', label: t('centerMcp') },
-    { id: 'prompts', label: t('centerPrompts') }, { id: 'permissions', label: t('centerPermissions') }, { id: 'plugins', label: t('centerPlugins') },
+    { id: 'prompts', label: t('centerPrompts') }, { id: 'permissions', label: t('centerPermissions') },
+    { id: 'agents', label: t('centerAgents') }, { id: 'plugins', label: t('centerPlugins') },
   ]
   return <section className={css.center} data-capability-center>
     <header className={css.header}>
@@ -90,9 +92,10 @@ export function CapabilityCenter(props: CapabilityCenterProps): ReactNode {
     </header>
     <nav className={css.tabs} aria-label={t('centerTitle')}>
       {tabs.map(item => <button key={item.id} type="button" aria-current={state.tab === item.id ? 'page' : undefined}
-        onClick={() => props.selectCapabilityTab(item.id)}>{item.label}</button>)}
+        onClick={() =>{  props.selectCapabilityTab(item.id) }}>{item.label}</button>)}
     </nav>
     {state.tab === 'plugins' ? <PluginManagerPage {...props} /> : <div className={css.body}>
+      {state.tab === 'agents' ? <AgentsPanel {...props} state={state} /> : null}
       {state.tab === 'permissions' ? <>
         <p className={css.hint}>{t('centerPermissionHint')}</p>
         <label className={css.selector}>{t('centerChooseSession')}<select value={sessionId ?? ''}
@@ -116,14 +119,14 @@ export function CapabilityCenter(props: CapabilityCenterProps): ReactNode {
             <p>{t('centerPermissionConfirm')}</p><div className={css.actions}>
               <button type="button" onClick={() => { props.selectCapabilityPermission(option.value); setConfirmPermission(null) }}>
                 {t('centerPermissionAccept')}</button>
-              <button type="button" onClick={() => setConfirmPermission(null)}>{t('cancel')}</button>
+              <button type="button" onClick={() =>{  setConfirmPermission(null) }}>{t('cancel')}</button>
             </div></div> : null}
         </li>)}</ul>
       </> : null}
       {state.tab === 'skills' ? <>
         <p className={css.hint}>{t('centerSkillHint')}</p>
         {state.sessions.length === 0 ? <p className={css.empty}>{t('centerNoSession')}</p> : <>
-          <label className={css.selector}>{t('centerChooseSession')}<select value={sessionId} onChange={event => props.selectCapabilitySession(event.target.value)}>
+          <label className={css.selector}>{t('centerChooseSession')}<select value={sessionId} onChange={(event) =>{  props.selectCapabilitySession(event.target.value) }}>
             {state.sessions.map(row => <option key={row.id} value={row.id}>{row.title}</option>)}
           </select></label>
           <p className={css.scope}>{t('centerScope')} · {t('centerSession')} · {selectedSession?.title}</p>
@@ -132,10 +135,10 @@ export function CapabilityCenter(props: CapabilityCenterProps): ReactNode {
             <div className={css.cardTop}><h2>/{skill.name}</h2><span className={css.badge}>{t(skill.source === 'project-dsh' || skill.source === 'project-agents' ? 'centerProjectSkill' : 'centerExternalSkill')}</span></div>
             <p>{skill.description}</p>{skill.whenToUse === undefined ? null : <p className={css.detail}>{skill.whenToUse}</p>}
             <div className={css.actions}><button type="button" disabled={!skill.editable || state.busy !== null}
-              onClick={() => props.toggleCapabilitySkill(skill.name, skill.modelInvocable, !skill.userInvocable)}>
+              onClick={() =>{  props.toggleCapabilitySkill(skill.name, skill.modelInvocable, !skill.userInvocable) }}>
               {t('centerUserInvocation')}: {t(skill.userInvocable ? 'centerEnabled' : 'centerInactive')}</button>
             <button type="button" disabled={!skill.editable || state.busy !== null}
-              onClick={() => props.toggleCapabilitySkill(skill.name, !skill.modelInvocable, skill.userInvocable)}>
+              onClick={() =>{  props.toggleCapabilitySkill(skill.name, !skill.modelInvocable, skill.userInvocable) }}>
               {t('centerModelInvocation')}: {t(skill.modelInvocable ? 'centerEnabled' : 'centerInactive')}</button></div>
             {skill.editable ? null : <p className={css.detail}>{t('centerSkillReadOnly')}</p>}
             {skill.path === undefined ? null : <code className={css.path}>{skill.path}</code>}
@@ -144,26 +147,26 @@ export function CapabilityCenter(props: CapabilityCenterProps): ReactNode {
       </> : null}
       {state.tab === 'mcp' ? <>
         <p className={css.hint}>{t('centerMcpHint')}</p>
-        <button type="button" className={css.addMcp} onClick={() => setEditingMcp('new')}>{t('centerAddMcp')}</button>{' '}
+        <button type="button" className={css.addMcp} onClick={() =>{  setEditingMcp('new') }}>{t('centerAddMcp')}</button>{' '}
         <button type="button" className={css.addMcp} onClick={() => { props.selectCapabilityTab('plugins'); props.openInstall() }}>
           {t('centerAddMcpBundle')}
         </button>
         {editingMcp === null ? null : <McpEditor key={editingMcp} row={state.mcp.find(row => row.managedId === editingMcp)}
-          t={t} busy={state.busy !== null} onCancel={() => setEditingMcp(null)} onSave={props.saveCapabilityMcp} />}
+          t={t} busy={state.busy !== null} onCancel={() =>{  setEditingMcp(null) }} onSave={props.saveCapabilityMcp} />}
         <p className={css.scope}>{t('centerScope')} · {t('centerProfile')}</p>
         {!state.loading && state.mcp.length === 0 ? <p className={css.empty}>{t('centerNoMcp')}</p> : null}
         <ul className={css.cards}>{state.mcp.map(row => <li className={css.card} key={row.id}>
           <div className={css.cardTop}><h2>{row.name}</h2><span className={css.badge}>{t(!row.enabled ? 'centerInactive' : row.phase === 'active' ? 'centerActive' : row.phase === 'failed' ? 'centerFailed' : 'centerPending')}</span></div>
           <p className={css.path}>{row.id}</p>
           <div className={css.actions}><button type="button" disabled={row.readOnly || state.busy !== null} title={row.readOnly ? t('centerManaged') : undefined}
-            onClick={() => props.toggleCapabilityMcp(row.id, !row.enabled)}>{t(row.enabled ? 'centerDisable' : 'centerEnable')}</button>
-          {row.managedId === undefined ? null : <><button type="button" disabled={state.busy !== null} onClick={() => setEditingMcp(row.managedId ?? row.id)}>{t('centerEditMcp')}</button>
-            <button type="button" disabled={state.busy !== null} onClick={() => setConfirmingMcp(row.managedId ?? row.id)}>{t('centerRemoveMcp')}</button></>}</div>
+            onClick={() =>{  props.toggleCapabilityMcp(row.id, !row.enabled) }}>{t(row.enabled ? 'centerDisable' : 'centerEnable')}</button>
+          {row.managedId === undefined ? null : <><button type="button" disabled={state.busy !== null} onClick={() =>{  setEditingMcp(row.managedId ?? row.id) }}>{t('centerEditMcp')}</button>
+            <button type="button" disabled={state.busy !== null} onClick={() =>{  setConfirmingMcp(row.managedId ?? row.id) }}>{t('centerRemoveMcp')}</button></>}</div>
           {confirmingMcp !== row.managedId ? null : <div className={css.confirm}>
             <p>{t('centerRemoveMcpConfirm', { name: row.name })}</p>
             <div className={css.actions}><button type="button" disabled={state.busy !== null} onClick={() => {
               props.removeCapabilityMcp(row.managedId ?? row.id); setConfirmingMcp(null)
-            }}>{t('centerRemoveMcp')}</button><button type="button" onClick={() => setConfirmingMcp(null)}>{t('cancel')}</button></div>
+            }}>{t('centerRemoveMcp')}</button><button type="button" onClick={() =>{  setConfirmingMcp(null) }}>{t('cancel')}</button></div>
           </div>}
         </li>)}</ul>
       </> : null}
@@ -174,10 +177,10 @@ export function CapabilityCenter(props: CapabilityCenterProps): ReactNode {
           <div className={css.cardTop}><h2>{row.name}</h2>{row.isDefault ? <span className={css.badge}>{t('centerDefault')}</span> : null}</div>
           {row.description === undefined ? null : <p>{row.description}</p>}
           {row.broken === undefined ? null : <p className={css.error}>{row.broken}</p>}
-          <div className={css.actions}><button type="button" disabled={state.busy !== null} onClick={() => props.viewCapabilityPrompt(row.id)}>
+          <div className={css.actions}><button type="button" disabled={state.busy !== null} onClick={() =>{  props.viewCapabilityPrompt(row.id) }}>
             {t(state.source?.id === row.id ? 'centerHide' : 'centerView')}</button>
           <button type="button" disabled={row.isDefault || row.broken !== undefined || state.busy !== null}
-            onClick={() => props.makeDefaultCapabilityPrompt(row.id)}>{t(row.isDefault ? 'centerDefault' : 'centerMakeDefault')}</button></div>
+            onClick={() =>{  props.makeDefaultCapabilityPrompt(row.id) }}>{t(row.isDefault ? 'centerDefault' : 'centerMakeDefault')}</button></div>
           {state.source?.id === row.id ? <pre className={css.source}>{state.source.text}</pre> : null}
         </li>)}</ul>
       </> : null}

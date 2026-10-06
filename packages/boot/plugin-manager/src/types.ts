@@ -13,6 +13,7 @@ export type ManagedMcpConfig =
   | { serverName: string; transport: 'streamable-http'; url: string; headers: Record<string, string> }
   | { serverName: string; transport: 'stdio'; command: string; args: string[]; env: Record<string, string>; cwd: string }
 
+/** Center-owned connection and its saved enablement. */
 export interface ManagedMcpServer {
   id: string
   enabled: boolean
@@ -30,7 +31,7 @@ export interface IncompatiblePlugin {
 
 /** Localizable management failure and optional external diagnostic. */
 export interface ManagementError {
-  code: ReadOnlyReason | 'unknown-plugin' | 'invalid-spec' | 'invalid-mcp' | 'duplicate-mcp' | 'unknown-mcp' | 'ambiguous-install' | 'not-bundle' | 'not-removable' | 'stop-profile' | 'bundle-in-use' | 'stale-approval' | 'incompatible-version' | 'operation-error'
+  code: ReadOnlyReason | 'unknown-plugin' | 'invalid-spec' | 'invalid-mcp' | 'duplicate-mcp' | 'unknown-mcp' | 'invalid-agent' | 'unknown-agent' | 'duplicate-agent' | 'ambiguous-install' | 'not-bundle' | 'not-removable' | 'stop-profile' | 'bundle-in-use' | 'stale-approval' | 'incompatible-version' | 'operation-error'
   diagnostic?: string
   /** Present with `incompatible-version`: the packages the running DSH version rejects. */
   incompatible?: IncompatiblePlugin[]
@@ -240,6 +241,26 @@ export interface PluginInstallLogChunk {
 export interface PluginChange {
   /** The operation that changed it. */
   readonly reason: 'plugin' | 'bundle' | 'install' | 'remove'
+}
+
+/** Profile-owned role delegated through the existing in-process subagent provider. */
+export interface ManagedAgentConfig {
+  /** Stable tool suffix, for example researcher in delegate_researcher. */
+  readonly name: string
+  readonly description: string
+  readonly persona: string
+  /** Provider and model are either both present or both omitted (inherit parent route). */
+  readonly provider?: string
+  readonly model?: string
+  /** Omitted means inherit tools; an empty list permits no tools. */
+  readonly tools?: readonly string[]
+}
+
+/** One role persisted in the profile patch. Running children retain their original configuration. */
+export interface ManagedAgent {
+  readonly id: string
+  readonly enabled: boolean
+  readonly config: ManagedAgentConfig
 }
 
 declare module '@deepseek-ai/cordis' {

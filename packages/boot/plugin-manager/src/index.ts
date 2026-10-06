@@ -23,14 +23,15 @@ import { bundleManifest, readProfileRegistry, registryArguments, runProfilePnpm,
 import { classifyInstallFailure } from './install-failure.ts'
 import { InvalidInstallSpecError, parseInstallSpec, type ParsedInstallSpec } from './install-spec.ts'
 import { attributeFailure, normalizeRegistry, NPMMIRROR_REGISTRY, registryPlan } from './registry.ts'
-import { readManagedMcpServers, writeManagedMcpServer, writePluginEnabled } from './patch.ts'
+import { readManagedAgents, writeManagedAgent, readManagedMcpServers, writeManagedMcpServer, writePluginEnabled } from './patch.ts'
+import { validateManagedAgent } from './managed-agent.ts'
 import { incompatiblePlugin, ManagementFailure } from './failure.ts'
 import { approveBuilds, readPendingBuilds } from './build-approval.ts'
 import { checkGithubConnection } from './github-connection.ts'
 import type {
   BundleInfo, BundleRowInfo, ChangeResult, InspectOptions, InstallBundleOptions, ManagementError, PackageResult, PluginChange,
   PluginEntryId, PluginInfo, PluginInspectProblem, PluginInstallCancellation, PluginInstallProgress, PluginInstallRequestId,
-  ManagedMcpConfig, ManagedMcpServer,
+  ManagedAgentConfig, ManagedAgent, ManagedMcpConfig, ManagedMcpServer,
   PluginRegistries, PluginSpecInspection, Registry,
 } from './types.ts'
 export type * from './types.ts'
@@ -64,8 +65,10 @@ export interface Config {
 /** An http(s) URL, as pnpm's `--registry` takes it. */
 const REGISTRY_URL = /^https?:\/\/\S+$/
 
-function validateMcpConfig(input: ManagedMcpConfig): ManagedMcpConfig {
-  if (typeof input !== 'object' || input === null || typeof input.serverName !== 'string'
+function validateMcpConfig(value: unknown): ManagedMcpConfig {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new ManagementFailure('invalid-mcp')
+  const input = value as Record<string, unknown>
+  if (typeof input.serverName !== 'string'
     || !/^[A-Za-z0-9_-]{1,32}$/.test(input.serverName)) throw new ManagementFailure('invalid-mcp')
   if (input.transport === 'streamable-http') {
     if (typeof input.url !== 'string' || input.url.length > 2048) throw new ManagementFailure('invalid-mcp')
@@ -77,7 +80,7 @@ function validateMcpConfig(input: ManagedMcpConfig): ManagedMcpConfig {
       !/^[!#$%&'*+.^_`|~0-9A-Za-z-]{1,128}$/.test(key) || typeof value !== 'string' || value.length > 4096)) {
       throw new ManagementFailure('invalid-mcp')
     }
-    return { serverName: input.serverName, transport: input.transport, url: input.url, headers: input.headers }
+    return { serverName: input.serverName, transport: input.transport, url: input.url, headers: input.headers as Record<string, string> }
   }
   if (input.transport !== 'stdio' || typeof input.command !== 'string' || input.command.trim() === ''
     || input.command.length > 1024 || !Array.isArray(input.args) || input.args.length > 64
@@ -89,7 +92,7 @@ function validateMcpConfig(input: ManagedMcpConfig): ManagedMcpConfig {
     throw new ManagementFailure('invalid-mcp')
   }
   return { serverName: input.serverName, transport: input.transport, command: input.command,
-    args: input.args, env: input.env, cwd: input.cwd }
+    args: input.args as string[], env: input.env as Record<string, string>, cwd: input.cwd }
 }
 
 const protectedModules = new Set([
@@ -463,13 +466,66 @@ export class PluginManager extends TypertRemoteService {
     }), { stage: 'enable', target: id, enabled }, 'plugin')
   }
 
-  /** List connections created in the capability center. Other MCP entries remain visible through listPlugins. */
+  /**
+   * List connections created in the capability center. Other MCP entries remain visible through listPlugins.
+   * @returns saved connections and their enablement.
+   */
   @Remote
   listManagedMcpServers(): Promise<ManagedMcpServer[]> {
     return readManagedMcpServers(this.profile.patchPath)
   }
 
-  /** Create or update one profile-wide MCP connection. A new row starts disabled until explicitly enabled. */
+  /**
+   * List editable delegation roles from this profile's user patch.
+   * @returns saved roles and their enablement.
+   */
+  @Remote
+  agentList(): Promise<ManagedAgent[]> { return readManagedAgents(this.profile.patchPath) }
+
+  /**
+   * Persist and activate a role tool. Existing child sessions retain their original role and policy.
+   * @param input - role configuration validated before persistence.
+   * @param id - owned role to edit; absent creates an enabled role.
+   * @returns persistence and runtime application outcome, including validation failures.
+   */
+  @Remote
+  agentSave(input: ManagedAgentConfig, id?: string): Promise<ChangeResult> {
+    return this.change(result => this.configure(async () => {
+      const config = validateManagedAgent(input)
+      const owned = await this.agentList()
+      if (id !== undefined && !owned.some(row => row.id === id)) throw new ManagementFailure('unknown-agent')
+      const target = id ?? `capability-agent-${randomUUID()}`
+      const rows = flatten(composeEntries([readProfilePatches('dsh', this.profile)]))
+      if (rows.some(row => row.id !== target && row.name === '@deepseek-ai/dsh-tool-subagent'
+        && typeof row.config === 'object' && row.config !== null
+        && (row.config as { toolName?: unknown }).toolName === `delegate_${config.name}`)) {
+        throw new ManagementFailure('duplicate-agent')
+      }
+      await writeManagedAgent(this.profile.patchPath, target, config)
+      result.warnings = await this.reload([target])
+    }), { stage: 'enable', target: id ?? 'new-agent', enabled: true }, 'plugin')
+  }
+
+  /**
+   * Delete only a role created through the capability center.
+   * @param id - owned role whose insertion and enablement overrides are removed.
+   * @returns persistence and runtime application outcome.
+   */
+  @Remote
+  agentDelete(id: string): Promise<ChangeResult> {
+    return this.change(result => this.configure(async () => {
+      if (!(await this.agentList()).some(row => row.id === id)) throw new ManagementFailure('unknown-agent')
+      await writeManagedAgent(this.profile.patchPath, id)
+      result.warnings = await this.reload()
+    }), { stage: 'remove', target: id }, 'plugin')
+  }
+
+  /**
+   * Create or update one profile-wide MCP connection. A new row starts disabled until explicitly enabled.
+   * @param input - connection configuration validated before persistence.
+   * @param id - owned connection to edit; absent creates a disabled connection.
+   * @returns persistence and runtime application outcome, including validation failures.
+   */
   @Remote
   saveManagedMcpServer(input: ManagedMcpConfig, id?: string): Promise<ChangeResult> {
     return this.change(result => this.configure(async () => {
@@ -486,10 +542,14 @@ export class PluginManager extends TypertRemoteService {
       }
       await writeManagedMcpServer(this.profile.patchPath, target, config)
       result.warnings = await this.reload(id === undefined ? [] : [target])
-    }), { stage: 'enable', target: id ?? input?.serverName ?? '', enabled: false }, 'plugin')
+    }), { stage: 'enable', target: id ?? 'new-mcp', enabled: false }, 'plugin')
   }
 
-  /** Remove only a capability-center-owned MCP connection from the profile patch. */
+  /**
+   * Remove only a capability-center-owned MCP connection from the profile patch.
+   * @param id - owned connection whose insertion and enablement overrides are removed.
+   * @returns persistence and runtime application outcome.
+   */
   @Remote
   removeManagedMcpServer(id: string): Promise<ChangeResult> {
     return this.change(result => this.configure(async () => {

@@ -12,6 +12,9 @@ function services(): CapabilityServices {
     setMcpEnabled: vi.fn(async () => 'applied' as const),
     saveMcp: vi.fn(async () => 'applied' as const),
     removeMcp: vi.fn(async () => 'applied' as const),
+    agents: vi.fn(async () => []), models: vi.fn(async () => []), agentRuns: vi.fn(async () => []),
+    saveAgent: vi.fn(async () => 'applied' as const), removeAgent: vi.fn(async () => 'applied' as const),
+    delegateAgent: vi.fn(async () => {}), openAgentRun: vi.fn(),
     permissions: vi.fn(async () => ({ current: 'workspace-write', defaultPreset: 'workspace-write', options: [] })),
     setPermission: vi.fn(async () => {}),
     prompts: vi.fn(async () => [{ id: 'standard', name: 'Standard', isDefault: true }]),
@@ -22,16 +25,34 @@ function services(): CapabilityServices {
 }
 
 describe('capability inventory', () => {
+  it('manages roles through the Host and submits delegation to the selected parent', async () => {
+    const remote = services()
+    const center = new CapabilityController(remote)
+    center.selectTab('agents')
+    await vi.waitFor(() =>{  expect(remote.agents).toHaveBeenCalled() })
+    const config = { name: 'researcher', description: 'Research sources', persona: 'Cite evidence.', tools: ['read'] }
+    expect(await center.saveAgent(config)).toBe(true)
+    expect(remote.saveAgent).toHaveBeenCalledWith(config, undefined)
+    expect(await center.delegateAgent('researcher', 'Review sources')).toBe(true)
+    expect(remote.delegateAgent).toHaveBeenCalledWith('session-a', 'researcher', 'Review sources')
+    await center.removeAgent('capability-agent-researcher')
+    expect(remote.removeAgent).toHaveBeenCalledWith('capability-agent-researcher')
+    center.dispose()
+  })
+
   it('writes permission through the selected session and refreshes its authoritative value', async () => {
     let current = 'workspace-write'
     const remote: CapabilityServices = {
       ...services(),
+      agents: vi.fn(async () => []), models: vi.fn(async () => []), agentRuns: vi.fn(async () => []),
+      saveAgent: vi.fn(async () => 'applied' as const), removeAgent: vi.fn(async () => 'applied' as const),
+      delegateAgent: vi.fn(async () => {}), openAgentRun: vi.fn(),
       permissions: vi.fn(async () => ({ current, defaultPreset: 'workspace-write', options: [] })),
-      setPermission: vi.fn(async (_id, preset) => { current = preset }),
+      setPermission: vi.fn(async (_id: string, preset: string) => { current = preset }),
     }
     const center = new CapabilityController(remote)
     center.selectTab('permissions')
-    await vi.waitFor(() => expect(center.store.getSnapshot().permissions?.current).toBe('workspace-write'))
+    await vi.waitFor(() =>{  expect(center.store.getSnapshot().permissions?.current).toBe('workspace-write') })
     await center.selectPermission('read-only')
     expect(remote.setPermission).toHaveBeenCalledWith('session-a', 'read-only')
     expect(center.store.getSnapshot().permissions?.current).toBe('read-only')
@@ -44,7 +65,7 @@ describe('capability inventory', () => {
     expect(remote.skills).toHaveBeenCalledWith('session-a')
     expect(center.store.getSnapshot().skills.map(row => row.name)).toEqual(['review'])
     center.selectTab('mcp')
-    await vi.waitFor(() => expect(center.store.getSnapshot().mcp).toHaveLength(1))
+    await vi.waitFor(() =>{  expect(center.store.getSnapshot().mcp).toHaveLength(1) })
     await center.toggleMcp('mcp:git', true)
     expect(remote.setMcpEnabled).toHaveBeenCalledWith('mcp:git', true)
     center.dispose()
@@ -56,7 +77,7 @@ describe('capability inventory', () => {
     const center = new CapabilityController(remote)
     const old = center.load()
     center.selectTab('prompts')
-    await vi.waitFor(() => expect(center.store.getSnapshot().prompts).toHaveLength(1))
+    await vi.waitFor(() =>{  expect(center.store.getSnapshot().prompts).toHaveLength(1) })
     resolveSkills?.([{ name: 'stale', description: 'Old', modelInvocable: true,
       userInvocable: true, source: 'project-agents', editable: true }])
     await old

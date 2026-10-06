@@ -5,7 +5,23 @@ import { tmpdir } from 'node:os'
 import { expect, it, onTestFinished } from 'vitest'
 import { applyEntryPatches } from '@deepseek-ai/cordis-plugin-include'
 import { loadOptionalPatches } from '@deepseek-ai/dsh-app-boot'
-import { readManagedMcpServers, writeManagedMcpServer, writePluginEnabled } from '../src/patch.ts'
+import { readManagedAgents, writeManagedAgent, readManagedMcpServers, writeManagedMcpServer, writePluginEnabled } from '../src/patch.ts'
+
+it('persists role routes and tool restrictions while preserving comments and enablement', async () => {
+  const file = await fixture('# retain\n- id: unrelated\n  disabled: false\n')
+  const id = 'capability-agent-test'
+  const config = { name: 'researcher', description: 'Research sources', persona: 'Read and cite.',
+    provider: 'test', model: 'mock', tools: ['read'] }
+  await writeManagedAgent(file, id, config)
+  expect(await readManagedAgents(file)).toEqual([{ id, enabled: true, config }])
+  await writePluginEnabled(file, id, '@deepseek-ai/dsh-tool-subagent', false)
+  await writeManagedAgent(file, id, { ...config, tools: [] })
+  expect(await readManagedAgents(file)).toEqual([{ id, enabled: false, config: { ...config, tools: [] } }])
+  await writeManagedAgent(file, id)
+  expect(await readManagedAgents(file)).toEqual([])
+  expect(await readFile(file, 'utf8')).toContain('# retain')
+  expect(loadOptionalPatches('test', file)).toEqual([{ id: 'unrelated', disabled: false }])
+})
 
 it('round-trips a disabled MCP server without replacing unrelated profile configuration', async () => {
   const file = await fixture('# user configuration\n- id: unrelated\n  disabled: false # keep\n')

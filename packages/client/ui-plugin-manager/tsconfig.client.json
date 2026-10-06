@@ -43,6 +43,9 @@
       "path": "../ui-sidebar"
     },
     {
+      "path": "../ui-workspace"
+    },
+    {
       "path": "../ui-slots"
     },
     {

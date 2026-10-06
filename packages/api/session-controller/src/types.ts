@@ -268,10 +268,12 @@ export interface SkillManagementEntry extends SkillEntry {
   readonly editable: boolean
 }
 
+/** Complete Skill inventory for one Session, including disabled entries. */
 export interface SkillManagementValue {
   readonly skills: readonly SkillManagementEntry[]
 }
 
+/** Project-owned Skill invocation flags to persist for one Session. */
 export interface SkillInvocationChange extends SkillListRequest {
   readonly name: string
   readonly modelInvocable: boolean
