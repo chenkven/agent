@@ -21,7 +21,7 @@
  * post-apply reload.
  */
 
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Button, IconPlusOutlineRegular, Modal, SegmentedControl } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
@@ -34,6 +34,7 @@ import type { ModelsSettingsStore, ProviderRow } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
 import type { SettingsSchemaOperations } from './schema-operations.ts'
 import { ProviderEditor, type ProviderEditorProps } from './ProviderEditor.tsx'
+import { apiKeyFailure } from './apiKey.ts'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
@@ -51,6 +52,8 @@ export interface ModelsSectionInjected {
   schema: SettingsSchemaOperations
   /** Section copy. */
   t: (key: keyof typeof en) => string
+  /** Isolated public demo: only the DeepSeek credential is writable in this browser. */
+  remoteCredentialOnly?: boolean
 }
 
 /**
@@ -221,12 +224,91 @@ export function providerCopy(template: string, target: ProviderIdentity): string
  * @returns the section, or null while the shell has not injected yet.
  */
 export function ModelsSection(props: ModelsSectionProps): ReactNode {
-  const { controller, useSnapshot, operations, schema, t, renderSlot } = props
+  const { controller, useSnapshot, operations, schema, t, renderSlot, remoteCredentialOnly } = props
   if (
     controller === undefined || useSnapshot === undefined || operations === undefined
     || schema === undefined || t === undefined
   ) return null
+  if (remoteCredentialOnly) return <RemoteCredentialSection injected={{ controller, useSnapshot, operations, t }} />
   return <Loaded injected={{ controller, useSnapshot, operations, schema, t }} renderSlot={renderSlot} />
+}
+
+/** Credential editor for a browser connected to its own isolated demo Host. */
+function RemoteCredentialSection({ injected }: {
+  injected: Pick<ModelsSectionFace, 'controller' | 'useSnapshot' | 'operations' | 't'>
+}): ReactNode {
+  const { controller, useSnapshot, operations, t } = injected
+  const state = useSnapshot(value => value)
+  const inputId = useId()
+  const [key, setKey] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [failure, setFailure] = useState<string | undefined>()
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (state.status === 'idle') void controller.load()
+  }, [controller, state.status])
+
+  const submit = (): void => {
+    const validation = apiKeyFailure(key)
+    if (key.length === 0 || validation !== undefined) {
+      setFailure(t(validation ?? 'keyBlank'))
+      return
+    }
+    setSaving(true)
+    setFailure(undefined)
+    setSaved(false)
+    void operations.storeCredential('DEEPSEEK_API_KEY', key.trim()).then(async (message) => {
+      if (message !== undefined) { setFailure(message); return }
+      setKey('')
+      await controller.load()
+      setSaved(true)
+    }).finally(() => { setSaving(false) })
+  }
+
+  return (
+    <div className={styles['section']}>
+      <h2 className={styles['title']}>{t('title')}</h2>
+      <p className={styles['intro']}>{t('remoteDemoIntro')}</p>
+      {state.status === 'error' ? (
+        <p className={styles['error']} role="alert">{`${t('loadFailed')}: ${state.error ?? ''}`}</p>
+      ) : null}
+      {state.status === 'ready' ? (
+        <div className={styles['rowCard']}>
+          <span className={styles['rowName']}>{t('remoteDemoProvider')}</span>
+          <p className={styles['intro']} role="status">
+            {state.remoteCredential?.configured === true ? t('credentialConfigured') : t('credentialMissing')}
+          </p>
+          <form className={styles['remoteForm']} onSubmit={(event) => { event.preventDefault(); submit() }}>
+            <label className={styles['field']} htmlFor={inputId}>
+              <span className={styles['fieldLabel']}>{t('keyInput')}</span>
+              <input
+                id={inputId}
+                className={styles['input']}
+                type="password"
+                autoComplete="new-password"
+                value={key}
+                placeholder={t('keyPlaceholder')}
+                disabled={!state.writable || saving}
+                onChange={(event) => { setKey(event.target.value); setFailure(undefined); setSaved(false) }}
+              />
+            </label>
+            {!state.writable ? <p className={styles['notice']}>{t('keyEnvLocked')}</p> : null}
+            {failure === undefined ? null : <p className={styles['error']} role="alert">{failure}</p>}
+            {saved ? <p className={styles['savedNotice']} role="status">{t('remoteDemoSaved')}</p> : null}
+            <button className={styles['primaryButton']} type="submit" disabled={!state.writable || saving}>
+              {saving ? t('applying') : t('apply')}
+            </button>
+          </form>
+        </div>
+      ) : null}
+      {state.status === 'error' ? (
+        <button type="button" className={styles['secondaryButton']} onClick={() => { void controller.load() }}>
+          {t('retry')}
+        </button>
+      ) : null}
+    </div>
+  )
 }
 
 function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderSlot: ModelsRenderSlot }): ReactNode {

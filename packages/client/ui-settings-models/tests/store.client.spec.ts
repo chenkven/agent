@@ -308,6 +308,23 @@ describe('edge joins', () => {
     })
   })
 
+  it('loads only the DeepSeek credential for an isolated remote demo', async () => {
+    const { ctx, seenRefs } = api({
+      providers: () => { throw new Error('provider directory must not be read') },
+      describeSettings: () => { throw new Error('settings document must not be read') },
+      describeCredentials: () => Promise.resolve(remoteOk({
+        DEEPSEEK_API_KEY: { configured: true, writable: true },
+      })),
+    })
+    const store = new ModelsSettingsStore(ctx, settingsSchema, new SettingsDescribeMirror(ctx, 'memory'), true)
+    await store.load()
+    expect(seenRefs).toEqual([['DEEPSEEK_API_KEY']])
+    expect(store.store.getSnapshot()).toMatchObject({
+      status: 'ready', writable: true,
+      remoteCredential: { configured: true, writable: true }, rows: [],
+    })
+  })
+
   it('reuses a held settings view after its refresh fails', async () => {
     let settingsCall = 0
     const { ctx, mirror } = api({

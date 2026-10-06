@@ -331,6 +331,37 @@ async function mountDeepSeekCard(overrides: Parameters<typeof scriptedFace>[0] =
 }
 
 describe('ModelsSection', () => {
+  it('lets an isolated remote demo replace its DeepSeek key without reading Host settings', async () => {
+    let configured = false
+    const set = vi.fn(() => {
+      configured = true
+      return Promise.resolve(remoteOk(undefined))
+    })
+    const scripted = scriptedFace({ set })
+    scripted.face.credentials.describe.mockImplementation((refs: string[]) => Promise.resolve(remoteOk(
+      Object.fromEntries(refs.map(ref => [ref, { configured, writable: true }])),
+    )))
+    const ctx = ctxWith(scripted.face)
+    const controller = new ModelsSettingsStore(ctx, settingsSchema, new SettingsDescribeMirror(ctx, 'memory'), true)
+    await controller.load()
+    render(<ModelsSection
+      controller={controller}
+      useSnapshot={bindSnapshotSelector(controller.store)}
+      operations={operationsWith(scripted.face)}
+      schema={settingsSchema}
+      t={t}
+      remoteCredentialOnly
+      renderSlot={() => null}
+    />)
+    expect(screen.getByText(en.credentialMissing)).toBeTruthy()
+    expect(screen.queryByText(/settings are unavailable/)).toBeNull()
+    fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'sk-demo-key' } })
+    fireEvent.click(screen.getByRole('button', { name: en.apply }))
+    await waitFor(() => { expect(screen.getByText(en.remoteDemoSaved)).toBeTruthy() })
+    expect(set).toHaveBeenCalledWith('DEEPSEEK_API_KEY', 'sk-demo-key')
+    expect(screen.getByText(en.credentialConfigured)).toBeTruthy()
+  })
+
   it('hides the add action when no settings namespace can open an editor', async () => {
     const scripted = scriptedFace()
     scripted.face.settings.describe.mockResolvedValue(remoteOk({ writable: true, hasDocument: false, namespaces: [] }))

@@ -1,6 +1,6 @@
 {
-  "name": "DeepSeek Harness",
-  "short_name": "DSH",
+  "name": "agent base",
+  "short_name": "agent base",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

@@ -1,23 +1,21 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { apply, inject } from '../src/client/index.ts'
-import { OfficialBrandMark, OfficialBrandName } from '../src/client/Brand.tsx'
+import { ProductBrandMark, ProductBrandName } from '../src/client/Brand.tsx'
 import { apply as hostApply } from '../src/index.ts'
 
 afterEach(() => {
   cleanup()
-  vi.unstubAllEnvs()
 })
 
 const HOLES = [
   'sidebar.brand.mark',
   'sidebar.brand.name',
+  'conversation.hero.brand.mark',
 ] as const
-
-const HERO_HOLE = 'conversation.hero.brand.mark'
 
 async function bench(declare = true) {
   const ctx = new Context()
@@ -25,13 +23,13 @@ async function bench(declare = true) {
   const slots = ctx.get('slots') as SlotRegistry
   const declareHoles = () => slots.register({
     name: 'root',
-    children: Object.fromEntries([...HOLES, HERO_HOLE].map(name => [name, { kind: 'single', scope: 'root' }])),
+    children: Object.fromEntries(HOLES.map(name => [name, { kind: 'single', scope: 'root' }])),
   } as never, () => null)
   const disposeHoles = declare ? declareHoles() : undefined
   return { ctx, slots, declareHoles, disposeHoles }
 }
 
-describe('official browser-brand plugin', () => {
+describe('product browser-brand plugin', () => {
   it('keeps the host Loader entry inert', () => {
     expect(hostApply).not.toThrow()
   })
@@ -40,15 +38,7 @@ describe('official browser-brand plugin', () => {
     expect(inject).toEqual(['slots'])
   })
 
-  it('leaves every slot empty outside the official build profile', async () => {
-    vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'local')
-    const subject = await bench()
-    await subject.ctx.plugin({ inject: [...inject], apply }).await()
-    for (const hole of HOLES) expect(subject.slots.entries(hole)).toHaveLength(0)
-  })
-
   it('fills declarations before or after apply and removes every occupant on teardown', async () => {
-    vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'official')
     const before = await bench()
     const fiber = before.ctx.plugin({ inject: [...inject], apply })
     await fiber.await()
@@ -71,21 +61,28 @@ describe('official browser-brand plugin', () => {
     for (const hole of HOLES) expect(after.slots.entries(hole)).toHaveLength(1)
   })
 
-  it('leaves the conversation hero on its declaring fallback even in official builds', async () => {
-    vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'official')
-    const subject = await bench()
+  it('can brand the sidebar without loading the conversation hero', async () => {
+    const subject = await bench(false)
     await subject.ctx.plugin({ inject: [...inject], apply }).await()
-    expect(subject.slots.entries(HERO_HOLE)).toHaveLength(0)
+    const dispose = subject.slots.register({
+      name: 'root',
+      children: Object.fromEntries(HOLES.slice(0, 2).map(name => [name, { kind: 'single', scope: 'root' }])),
+    } as never, () => null)
+    expect(subject.slots.entries('sidebar.brand.mark')).toHaveLength(1)
+    expect(subject.slots.entries('sidebar.brand.name')).toHaveLength(1)
+    expect(subject.slots.entries('conversation.hero.brand.mark')).toHaveLength(0)
+    dispose()
   })
 
-  it('renders the official name independently from both requested mark sizes', () => {
-    const name = render(<OfficialBrandName />)
-    expect(name.container.querySelector('svg')?.getAttribute('viewBox')).toBe('26 0 156 24')
+  it('renders the product name and shared mark at host-requested sizes', () => {
+    const name = render(<ProductBrandName />)
+    expect(name.container.textContent).toBe('agent base')
     name.unmount()
 
-    const mark = render(<OfficialBrandMark size={34} />)
+    const mark = render(<ProductBrandMark size={34} className="hero-mark" />)
     expect(mark.container.querySelector('svg')?.getAttribute('width')).toBe('34')
-    mark.rerender(<OfficialBrandMark size={24} />)
+    expect(mark.container.querySelector('svg')?.getAttribute('class')).toBe('hero-mark')
+    mark.rerender(<ProductBrandMark size={24} />)
     expect(mark.container.querySelector('svg')?.getAttribute('width')).toBe('24')
   })
 })

@@ -44,6 +44,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 /** Dictionary namespace owned by this plugin. */
 const NS = 'settings.models'
 
+/** The isolated demo gateway marks only its browser credential editor. */
+function remoteCredentialDemo(ctx: ClientContext): boolean {
+  if (ctx.remote.$host.isLoopback || typeof document === 'undefined') return false
+  return document.cookie.split(';').some(part => part.trim() === 'mentor_demo_models=1')
+}
+
 export type {
   ModelsSettingsState, ProviderDirectoryEntry, ProviderRow,
 } from './store.ts'
@@ -86,7 +92,8 @@ export function apply(ctx: ClientContext): void {
   // Bound once here, where the Remote namespaces are declared in this plugin's
   // own `inject`; the cards receive callbacks and never a context.
   const operations = createModelsOperations(ctx)
-  const controller = new ModelsSettingsStore(ctx, schema, ctx.configForms.describe())
+  const credentialOnly = remoteCredentialDemo(ctx)
+  const controller = new ModelsSettingsStore(ctx, schema, ctx.configForms.describe(), credentialOnly)
   // Registration-time text (the nav label thunk) and the inject faces share
   // one bound translate; copy freshness rides the locale revision.
   const t = ctx.locale.bind(NS) as ModelsSectionInjected['t']
@@ -96,6 +103,7 @@ export function apply(ctx: ClientContext): void {
     operations,
     schema,
     t,
+    remoteCredentialOnly: credentialOnly,
   })
   const deepSeekOnboardingInjected = (): DeepSeekOnboardingInjected => ({
     automatic: credentialOnboarding,

@@ -39,6 +39,8 @@ Host 配置 `credentialOnboarding` 默认为 `true`。Electron preload 标记会
 
 ### API 密钥
 
+独立远程演示通过浏览器 Cookie `mentor_demo_models=1` 显示仅管理 DeepSeek 密钥的卡片，不加载 Host 设置文档。卡片通过凭据 Remote 查看并写入 `DEEPSEEK_API_KEY`；提供商配置仍由该演示实例管理。
+
 API 密钥输入框初始为空，并通过 `autocomplete="new-password"` 请求浏览器不要自动填入已保存的登录密码。
 
 编辑卡片上的主字段是单独一个 **API 密钥**输入框——页面从不询问环境变量名。键入的密钥经 `credentials.set` 以**只写**方式存入 profile 的引用之下，profile 没有引用时便派生 `<ROUTE>_API_KEY`，pi-ai profile 会把这次派生记录为 `apiKeyEnv`，因此 `cordis.patch.yml` 从不携带密钥值。为新的 pi-ai 提供商留空密钥会保存一个不带引用的 profile，从而保留提供商原生认证（例如 Bedrock 凭据链或 Vertex ADC）。只有确认引用的凭据已配置时，行才会以绿色实心点标示 API 密钥状态；只有确认具名引用缺失时，才会以红色实心点标示。「应用」成功后会发出本地无障碍状态消息，且绝不回显任何机密内容。

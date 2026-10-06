@@ -101,6 +101,8 @@ export interface ModelsSettingsState {
   credentialError: string | null
   /** Whether the settings provider accepts writes. */
   writable: boolean
+  /** Credential state in an isolated remote demo whose Host settings document is unavailable. */
+  remoteCredential: CredentialInfo | undefined
   /** Every configurable provider joined with its configured/credential state. */
   rows: readonly ProviderRow[]
   /** Namespace views by ns, for the editor's schema/layers/secrets. */
@@ -155,7 +157,8 @@ function apiKeyEnvOf(
 export class ModelsSettingsStore {
   /** The snapshot the section renders from (uSES-safe store). */
   readonly store: SnapshotStore<ModelsSettingsState> = createSnapshotStore<ModelsSettingsState>({
-    status: 'idle', error: null, credentialError: null, writable: false, rows: [], namespaces: new Map(),
+    status: 'idle', error: null, credentialError: null, writable: false, remoteCredential: undefined,
+    rows: [], namespaces: new Map(),
   })
 
   /** Latest load wins; an older response never overwrites a newer one. */
@@ -166,24 +169,39 @@ export class ModelsSettingsStore {
    * `remote.credentials` namespaces carry the directory and credential reads.
    * @param schema - settings-owned schema and immutable path operations.
    * @param describeFace - the shared mirror's describe face (namespace views and writability).
+   * @param remoteCredentialOnly - isolated demo browser that edits only its DeepSeek credential.
    */
   constructor(
     private readonly ctx: ClientContext,
     private readonly schema: SettingsSchemaOperations,
     private readonly describeFace: SettingsDescribeFace,
+    private readonly remoteCredentialOnly = false,
   ) {}
 
   /**
-   * Refresh the whole page snapshot: the provider directory and the mirror's
-   * settings answer in parallel, then one batched credential describe over
-   * every referenced ref. Provider failure or absence of an initial settings
-   * answer keeps the last good rows and surfaces an error; a failed settings
-   * refresh reuses the mirror's held view.
+   * Refresh the page snapshot. An isolated demo reads only its DeepSeek
+   * credential; the full editor joins providers, settings, and credentials.
+   * Provider failure or absence of an initial settings answer keeps the last
+   * good rows and surfaces an error; a failed settings refresh reuses the
+   * mirror's held view.
    * @returns nothing; the snapshot carries the outcome.
    */
   async load(): Promise<void> {
     const generation = ++this.generation
     this.store.update((s) => { s.status = 'loading'; s.error = null })
+    if (this.remoteCredentialOnly) {
+      const response = await this.ctx.remote.credentials.describe(['DEEPSEEK_API_KEY'])
+      if (!response.ok) { this.failLoad(generation, response.error.message); return }
+      if (generation !== this.generation) return
+      const credential = response.value.DEEPSEEK_API_KEY
+      this.store.update((s) => {
+        s.status = 'ready'
+        s.error = null
+        s.writable = credential?.writable === true
+        s.remoteCredential = credential
+      })
+      return
+    }
     const [registered, declared] = await Promise.all([
       this.ctx.remote.llm.listProviders(),
       this.ctx.remote.llm.listConfigurableProviders(),

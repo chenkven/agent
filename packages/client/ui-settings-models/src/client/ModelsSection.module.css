@@ -255,6 +255,17 @@
   gap: 6px;
 }
 
+.remoteForm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.remoteForm .field {
+  width: 100%;
+}
+
 .fieldLabel {
   display: inline-flex;
   align-items: center;

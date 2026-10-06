@@ -69,6 +69,22 @@ function declare(slots: SlotRegistry): () => void {
 }
 
 describe('ui-settings-models apply', () => {
+  it('selects the credential-only Models page for the isolated demo browser', async () => {
+    const { ctx, slots } = await bench(false)
+    declare(slots)
+    vi.stubGlobal('document', { cookie: 'mentor_demo_models=1' })
+    try {
+      const plugin = ctx.plugin({ inject: [...inject], apply })
+      await plugin.await()
+      const injected = slots.entries('settings.section')[0]!.inject as () => {
+        remoteCredentialOnly?: boolean
+      }
+      expect(injected().remoteCredentialOnly).toBe(true)
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('keeps manual credential onboarding available when the native shell owns automatic onboarding', async () => {
     const { ctx, slots } = await bench()
     declare(slots)
