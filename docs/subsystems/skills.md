@@ -2,6 +2,8 @@
 
 English | [中文](skills.zh.md)
 
+The Session catalog's `SkillManagementValue` contains `SkillManagementEntry` rows with invocation flags, source ownership, and `editable`. `SkillInvocationChange` addresses a Session and winning Skill by name and supplies both invocation flags. Only files within that Session's project Skill roots are writable; other catalog entries remain read-only. See the [capability center](../../packages/client/ui-plugin-manager/README.md) for the product controls.
+
 The [skill capability family](../../packages/skill) includes the Service Definition ([dsh-skill](../../packages/skill/skill), `ctx.skills`), the local Service Provider ([dsh-skill-filesystem](../../packages/skill/skill-filesystem)), optional packaged providers ([dsh-skill-badge](../../packages/skill/skill-badge), [dsh-skill-office](../../packages/skill/skill-office), and the Windows ACL diagnosis provider in [dsh-sandbox-windows-acl](../../packages/sandbox/sandbox-windows-acl)), and the Consumer ([dsh-tool-skill](../../packages/skill/tool-skill)). The registry merges provider catalogs across its host and per-scope layers; providers contribute local or packaged skills; the Consumer owns the initial and replacement catalogs plus the model-facing `skill` tool. Skills are optional instructions, not session events, so their vocabulary lives here rather than in [core.md](core.md).
 
 Source: [`packages/skill/skill/src/index.ts`](../../packages/skill/skill/src/index.ts), [`packages/skill/skill-filesystem/src/index.ts`](../../packages/skill/skill-filesystem/src/index.ts), [`packages/skill/skill-badge/src/index.ts`](../../packages/skill/skill-badge/src/index.ts), [`packages/skill/skill-office/src/index.ts`](../../packages/skill/skill-office/src/index.ts), [`packages/sandbox/sandbox-windows-acl/src/acl-skill.ts`](../../packages/sandbox/sandbox-windows-acl/src/acl-skill.ts), and [`packages/skill/tool-skill/src/index.ts`](../../packages/skill/tool-skill/src/index.ts).
@@ -259,6 +261,21 @@ Host service backing `ctx.remote.skills` without activating a cold Agent.
  * @throws RemoteError when the Session cannot be inspected or no registry can serve it.
  */
 @Remote async list(request: SkillListRequest, signal: AbortSignal): Promise<SkillListValue>
+
+/**
+ * Inventory every skill visible to a Session, including those disabled for user invocation.
+ * @param request - Session whose winning Skill catalog is inspected.
+ * @param signal - caller cancellation signal.
+ * @returns inventory with source ownership and editability.
+ */
+@Remote async manageList(request: SkillListRequest, signal: AbortSignal): Promise<SkillManagementValue>
+
+/**
+ * Edit invocation flags only for a winning Skill file inside this Session's project skill roots.
+ * @param change - Session, Skill name, and invocation flags to persist.
+ * @param signal - caller cancellation signal.
+ */
+@Remote async setInvocation(change: SkillInvocationChange, signal: AbortSignal): Promise<void>
 ```
 
 Source: [`packages/api/session-controller/src/skill-catalog.ts`](../../packages/api/session-controller/src/skill-catalog.ts)
@@ -303,6 +320,9 @@ register(skill: SkillRegistration): () => void
  * @returns all sorted winning summaries.
  */
 async list(options: SkillViewOptions = {}): Promise<SkillSummary[]>
+
+/** Discard cached discovery after a trusted Host editor changes a provider's source file. */
+invalidateCatalog(): void
 
 /**
  * Observe the current invocation-neutral catalog and whether discovery completed within a stable revision.

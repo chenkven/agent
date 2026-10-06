@@ -1677,6 +1677,42 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'Saved and runtime outcomes, including higher-priority overrides.',
       },
       {
+        signature: '@Remote listManagedMcpServers(): Promise<ManagedMcpServer[]>',
+        description: 'List connections created in the capability center. Other MCP entries remain visible through listPlugins.',
+        parameters: [],
+        returns: 'saved connections and their enablement.',
+      },
+      {
+        signature: '@Remote agentList(): Promise<ManagedAgent[]>',
+        description: 'List editable delegation roles from this profile\'s user patch.',
+        parameters: [],
+        returns: 'saved roles and their enablement.',
+      },
+      {
+        signature: '@Remote agentSave(input: ManagedAgentConfig, id?: string): Promise<ChangeResult>',
+        description: 'Persist and activate a role tool. Existing child sessions retain their original role and policy.',
+        parameters: [{ name: 'input', description: 'role configuration validated before persistence.' }, { name: 'id', description: 'owned role to edit; absent creates an enabled role.' }],
+        returns: 'persistence and runtime application outcome, including validation failures.',
+      },
+      {
+        signature: '@Remote agentDelete(id: string): Promise<ChangeResult>',
+        description: 'Delete only a role created through the capability center.',
+        parameters: [{ name: 'id', description: 'owned role whose insertion and enablement overrides are removed.' }],
+        returns: 'persistence and runtime application outcome.',
+      },
+      {
+        signature: '@Remote saveManagedMcpServer(input: ManagedMcpConfig, id?: string): Promise<ChangeResult>',
+        description: 'Create or update one profile-wide MCP connection. A new row starts disabled until explicitly enabled.',
+        parameters: [{ name: 'input', description: 'connection configuration validated before persistence.' }, { name: 'id', description: 'owned connection to edit; absent creates a disabled connection.' }],
+        returns: 'persistence and runtime application outcome, including validation failures.',
+      },
+      {
+        signature: '@Remote removeManagedMcpServer(id: string): Promise<ChangeResult>',
+        description: 'Remove only a capability-center-owned MCP connection from the profile patch.',
+        parameters: [{ name: 'id', description: 'owned connection whose insertion and enablement overrides are removed.' }],
+        returns: 'persistence and runtime application outcome.',
+      },
+      {
         signature: '@Remote setBundleEnabled(name: string, enabled: boolean): Promise<ChangeResult>',
         description: 'Select or remove a bundle layer while retaining installed dependencies.',
         parameters: [{ name: 'name', description: 'Bundle package name.' }, { name: 'enabled', description: 'Whether the bundle contributes its patch layer.' }],
@@ -2428,6 +2464,17 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'user-invocable skill metadata without loading skill bodies.',
         throws: ['RemoteError when the Session cannot be inspected or no registry can serve it.'],
       },
+      {
+        signature: '@Remote async manageList(request: SkillListRequest, signal: AbortSignal): Promise<SkillManagementValue>',
+        description: 'Inventory every skill visible to a Session, including those disabled for user invocation.',
+        parameters: [{ name: 'request', description: 'Session whose winning Skill catalog is inspected.' }, { name: 'signal', description: 'caller cancellation signal.' }],
+        returns: 'inventory with source ownership and editability.',
+      },
+      {
+        signature: '@Remote async setInvocation(change: SkillInvocationChange, signal: AbortSignal): Promise<void>',
+        description: 'Edit invocation flags only for a winning Skill file inside this Session\'s project skill roots.',
+        parameters: [{ name: 'change', description: 'Session, Skill name, and invocation flags to persist.' }, { name: 'signal', description: 'caller cancellation signal.' }],
+      },
     ],
   },
   {
@@ -2640,6 +2687,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'List invocation-neutral skill summaries for a workspace. Consumers apply model or user invocation policy at their operational boundary. Lookup options and provider candidates are readonly same-process values borrowed throughout discovery.',
         parameters: [{ name: 'options', description: 'view options; `scope` selects the viewing agent\'s layers, `cwd` selects project roots, and `signal` cancels discovery.' }],
         returns: 'all sorted winning summaries.',
+      },
+      {
+        signature: 'invalidateCatalog(): void',
+        description: 'Discard cached discovery after a trusted Host editor changes a provider\'s source file.',
+        parameters: [],
       },
       {
         signature: 'async snapshot(options: SkillViewOptions = {}): Promise<SkillCatalogSnapshot>',
@@ -5690,8 +5742,24 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface LspRange {\n    readonly start: LspPosition;\n    readonly end: LspPosition;\n}',
   },
   {
+    name: 'ManagedAgent',
+    declaration: 'export interface ManagedAgent {\n    readonly id: string;\n    readonly enabled: boolean;\n    readonly config: ManagedAgentConfig;\n}',
+  },
+  {
+    name: 'ManagedAgentConfig',
+    declaration: 'export interface ManagedAgentConfig {\n    readonly name: string;\n    readonly description: string;\n    readonly persona: string;\n    readonly provider?: string;\n    readonly model?: string;\n    readonly tools?: readonly string[];\n}',
+  },
+  {
+    name: 'ManagedMcpConfig',
+    declaration: 'export type ManagedMcpConfig = {\n    serverName: string;\n    transport: \'streamable-http\';\n    url: string;\n    headers: Record<string, string>;\n} | {\n    serverName: string;\n    transport: \'stdio\';\n    command: string;\n    args: string[];\n    env: Record<string, string>;\n    cwd: string;\n};',
+  },
+  {
+    name: 'ManagedMcpServer',
+    declaration: 'export interface ManagedMcpServer {\n    id: string;\n    enabled: boolean;\n    config: ManagedMcpConfig;\n}',
+  },
+  {
     name: 'ManagementError',
-    declaration: 'export interface ManagementError {\n    code: ReadOnlyReason | \'unknown-plugin\' | \'invalid-spec\' | \'ambiguous-install\' | \'not-bundle\' | \'not-removable\' | \'stop-profile\' | \'bundle-in-use\' | \'stale-approval\' | \'incompatible-version\' | \'operation-error\';\n    diagnostic?: string;\n    incompatible?: IncompatiblePlugin[];\n}',
+    declaration: 'export interface ManagementError {\n    code: ReadOnlyReason | \'unknown-plugin\' | \'invalid-spec\' | \'invalid-mcp\' | \'duplicate-mcp\' | \'unknown-mcp\' | \'invalid-agent\' | \'unknown-agent\' | \'duplicate-agent\' | \'ambiguous-install\' | \'not-bundle\' | \'not-removable\' | \'stop-profile\' | \'bundle-in-use\' | \'stale-approval\' | \'incompatible-version\' | \'operation-error\';\n    diagnostic?: string;\n    incompatible?: IncompatiblePlugin[];\n}',
   },
   {
     name: 'ManualCompactAgentContext',
@@ -7058,6 +7126,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface SkillEntry {\n    readonly path?: string;\n    readonly name: string;\n    readonly description: string;\n    readonly whenToUse?: string;\n    readonly modelInvocable: boolean;\n}',
   },
   {
+    name: 'SkillInvocationChange',
+    declaration: 'export interface SkillInvocationChange extends SkillListRequest {\n    readonly name: string;\n    readonly modelInvocable: boolean;\n    readonly userInvocable: boolean;\n}',
+  },
+  {
     name: 'SkillInvocationPolicy',
     declaration: 'export interface SkillInvocationPolicy {\n    readonly modelInvocable: boolean;\n    readonly userInvocable: boolean;\n}',
   },
@@ -7072,6 +7144,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SkillLookupOptions',
     declaration: 'export interface SkillLookupOptions {\n    readonly cwd?: string | undefined;\n    readonly signal?: AbortSignal | undefined;\n}',
+  },
+  {
+    name: 'SkillManagementEntry',
+    declaration: 'export interface SkillManagementEntry extends SkillEntry {\n    readonly userInvocable: boolean;\n    readonly source: string;\n    readonly editable: boolean;\n}',
+  },
+  {
+    name: 'SkillManagementValue',
+    declaration: 'export interface SkillManagementValue {\n    readonly skills: readonly SkillManagementEntry[];\n}',
   },
   {
     name: 'SkillProvider',

@@ -10,10 +10,22 @@
   zh: 456536d58f5b358c
 /browser-brand-package/summary:
   en: 19f780945a1c332a
-  zh: e78795a2b67e3fce
+  zh: 5962647ed7dd005c
+/browser-brand-package/table-of-contents:
+  en: 2e89ddb1e73218cb
+  zh: 5b9aa0e046408356
 /browser-brand-package/use-this-package:
-  en: fe0b891d4d4fc5d1
-  zh: e3d7811bbbcc3998
+  en: c738e0bef17a93d4
+  zh: 121f1a509d6f6e23
+/browser-brand-package/use-this-package/dev-note:
+  en: ccf4bb214614e1cd
+  zh: c54705d18504fc9a
+/browser-brand-package/model-experience:
+  en: ed175ff9f2cac62b
+  zh: 23cfdc5b97ffae5c
+/browser-brand-package/model-experience/kv-cache-effect:
+  en: 7c3e8191bd6621fa
+  zh: 5fa2c3493064fdc5
 /browser-brand-package/known-limitations-and-deferred-work:
-  en: 899ef3a756807e36
-  zh: 8ec726cacd487575
+  en: 51f56dd22b1f412e
+  zh: 68d4700b601a388e

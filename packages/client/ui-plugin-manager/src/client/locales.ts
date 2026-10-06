@@ -9,7 +9,7 @@ export const INSTALL_PATH_EXAMPLE = '/Users/name/my-plugin'
 export const zh = {
   centerModels: '模型',
   centerAgents: '多 Agent',
-  centerAgentHint: '角色保存到当前 Profile。主 Agent 使用 delegate_角色标识 委派任务，子代理拥有独立上下文，继承父会话权限。编辑仅影响后续委派。',
+  centerAgentHint: '角色保存到当前 Profile。主 Agent 使用 delegate_角色标识 委派任务，子代理拥有独立上下文，继承父会话沙箱范围，不能申请扩大权限。编辑仅影响后续委派。',
   centerAgentAdd: '添加角色',
   centerAgentExample: '添加研究员示例',
   centerAgentEdit: '编辑角色',
@@ -22,6 +22,7 @@ export const zh = {
   centerAgentTools: '允许工具（每行一个，留空继承父会话工具）',
   centerAgentNoTools: '不允许使用全局工具（保留系统内置子代理工具，禁止继续委派）',
   centerAgentReady: '已就绪',
+  centerAgentToolName: 'delegate_{name}',
   centerAgentSave: '保存角色',
   centerAgentEmpty: '还没有角色。添加研究员示例后即可在聊天中委派任务。',
   centerAgentDelegate: '委派任务',
@@ -312,7 +313,7 @@ export type PluginManagerLocaleKey = keyof typeof zh
 export const en = {
   centerModels: 'Models',
   centerAgents: 'Multi-Agent',
-  centerAgentHint: 'Roles are saved in this profile. The main Agent delegates through delegate_ROLE. Children have independent context and inherit parent permissions. Edits apply to future delegations.',
+  centerAgentHint: 'Roles are saved in this profile. The main Agent delegates through delegate_ROLE. Children have independent context and inherit the parent sandbox scope without approval escalation. Edits apply to future delegations.',
   centerAgentAdd: 'Add role',
   centerAgentExample: 'Add researcher example',
   centerAgentEdit: 'Edit role',
@@ -325,6 +326,7 @@ export const en = {
   centerAgentTools: 'Allowed tools (one per line; blank inherits parent tools)',
   centerAgentNoTools: 'Allow no global tools (system child tools remain; further delegation is blocked)',
   centerAgentReady: 'Ready',
+  centerAgentToolName: 'delegate_{name}',
   centerAgentSave: 'Save role',
   centerAgentEmpty: 'No roles yet. Add the researcher example to delegate from chat.',
   centerAgentDelegate: 'Delegate task',

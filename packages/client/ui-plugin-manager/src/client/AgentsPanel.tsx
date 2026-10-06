@@ -78,7 +78,7 @@ export function AgentsPanel(props: CapabilityCenterProps & { readonly state: Cap
       <div className={css.cardTop}><h2>{row.config.name}</h2><span className={css.badge}>
         {t(!row.enabled ? 'centerInactive' : row.phase === 'active' ? 'centerAgentReady'
           : row.phase === 'failed' ? 'centerFailed' : 'centerPending')}</span></div>
-      <p>{row.config.description}</p><code className={css.path}>delegate_{row.config.name}</code>
+      <p>{row.config.description}</p><code className={css.path}>{t('centerAgentToolName').replace('{name}', row.config.name)}</code>
       <p>{t('centerAgentModel')}: {row.config.provider === undefined ? t('centerAgentInherit')
         : `${row.config.provider} / ${row.config.model}`}</p>
       <p>{row.config.tools === undefined ? t('centerAgentTools') : row.config.tools.length === 0

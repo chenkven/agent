@@ -6,6 +6,10 @@ The [boot package group](../../packages/boot/README.md) owns launcher-provided p
 
 ## Management records
 
+`ManagedMcpConfig` describes an HTTP connection (`serverName`, `url`, `headers`) or stdio process (`serverName`, `command`, `args`, `env`, `cwd`); `transport` discriminates them. `ManagedMcpServer` adds its owned `id` and saved `enabled` state. Only center-owned rows can be edited or deleted by the managed connection API.
+
+`ManagedAgentConfig` carries a role `name`, `description`, and `persona`, paired optional `provider`/`model`, and an optional global-tool `tools` allowlist. `ManagedAgent` adds owned `id` and saved `enabled`. Omission inherits parent global tools; an empty list denies global tools. Roles delegate in-process with depth capped at one, inherit the parent's sandbox scope, and pin approval to `never`. Profile management validates ownership and duplicate tool names before editing the user patch; activation outcome is reported through `ChangeResult`.
+
 `PluginEntryId` identifies one Loader entry; callers obtain it from `listPlugins` rather than constructing a patch id.
 
 `PluginInfo` carries module identity, effective enablement, fiber phase and optional display `meta`, plus a unique `patchId` or a `readOnlyReason`.
@@ -135,6 +139,48 @@ Manage profile files and apply their declared reload lifecycle.
  * @returns Saved and runtime outcomes, including higher-priority overrides.
  */
 @Remote setPluginEnabled(id: PluginEntryId, enabled: boolean): Promise<ChangeResult>
+
+/**
+ * List connections created in the capability center. Other MCP entries remain visible through listPlugins.
+ * @returns saved connections and their enablement.
+ */
+@Remote listManagedMcpServers(): Promise<ManagedMcpServer[]>
+
+/**
+ * List editable delegation roles from this profile's user patch.
+ * @returns saved roles and their enablement.
+ */
+@Remote agentList(): Promise<ManagedAgent[]>
+
+/**
+ * Persist and activate a role tool. Existing child sessions retain their original role and policy.
+ * @param input - role configuration validated before persistence.
+ * @param id - owned role to edit; absent creates an enabled role.
+ * @returns persistence and runtime application outcome, including validation failures.
+ */
+@Remote agentSave(input: ManagedAgentConfig, id?: string): Promise<ChangeResult>
+
+/**
+ * Delete only a role created through the capability center.
+ * @param id - owned role whose insertion and enablement overrides are removed.
+ * @returns persistence and runtime application outcome.
+ */
+@Remote agentDelete(id: string): Promise<ChangeResult>
+
+/**
+ * Create or update one profile-wide MCP connection. A new row starts disabled until explicitly enabled.
+ * @param input - connection configuration validated before persistence.
+ * @param id - owned connection to edit; absent creates a disabled connection.
+ * @returns persistence and runtime application outcome, including validation failures.
+ */
+@Remote saveManagedMcpServer(input: ManagedMcpConfig, id?: string): Promise<ChangeResult>
+
+/**
+ * Remove only a capability-center-owned MCP connection from the profile patch.
+ * @param id - owned connection whose insertion and enablement overrides are removed.
+ * @returns persistence and runtime application outcome.
+ */
+@Remote removeManagedMcpServer(id: string): Promise<ChangeResult>
 
 /** Select or remove a bundle layer while retaining installed dependencies.
  * @param name Bundle package name.

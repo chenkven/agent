@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for mentor-demo.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/user/guide/mentor-demo.md
+/:
+  en: 7811718bb0f61aa2
+  zh: ba78d61de7ad5c72
+/mentor-demo:
+  en: 3e76c012cb3c3b6b
+  zh: 432e8ffef683acaf
+/mentor-demo/prerequisites:
+  en: 537e4bb624ba57e9
+  zh: 7cbd948a17925455
+/mentor-demo/demonstration:
+  en: a258b768e8793348
+  zh: 97d3b22127f70e67
+/mentor-demo/reuse:
+  en: 94999a9a20a05521
+  zh: 53fe69c0b617abab
+/mentor-demo/verification-evidence:
+  en: 6ce5cb09508def46
+  zh: 23235e72d939cbbd
+/mentor-demo/remote-access:
+  en: f359a5c6aaa3f702
+  zh: 528e81ee8babbe64
+/mentor-demo/troubleshooting:
+  en: 38ce34995098eaae
+  zh: 0b9e73adee598391

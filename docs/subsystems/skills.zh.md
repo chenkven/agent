@@ -2,6 +2,8 @@
 
 [English](skills.md) | 中文
 
+会话目录的 `SkillManagementValue` 包含 `SkillManagementEntry` 条目，提供调用开关、来源归属和 `editable`。`SkillInvocationChange` 通过会话和胜出的 Skill 名称定位目标，并提供两个调用开关。只有该会话项目 Skill 根目录中的文件可写，其他目录条目只读。产品操作参见[能力中心](../../packages/client/ui-plugin-manager/README.zh.md)。
+
 [skill（技能）能力族](../../packages/skill) 包含 Service Definition（[dsh-skill](../../packages/skill/skill)，`ctx.skills`）、本地 Service Provider（[dsh-skill-filesystem](../../packages/skill/skill-filesystem)）、可选的随包提供方（[dsh-skill-badge](../../packages/skill/skill-badge)、[dsh-skill-office](../../packages/skill/skill-office) 及 [dsh-sandbox-windows-acl](../../packages/sandbox/sandbox-windows-acl) 中的 Windows ACL 诊断提供方）和 Consumer（[dsh-tool-skill](../../packages/skill/tool-skill)）。注册表在其宿主层与各 scope 层之间合并各提供方的目录；提供方贡献本地或随包 skill；Consumer 拥有初始目录和替换目录，以及面向模型的 `skill` 工具。skill 是可选的指令而非会话事件，因此其词汇定义在此处而非 [core.md](core.zh.md)。
 
 源码：[`packages/skill/skill/src/index.ts`](../../packages/skill/skill/src/index.ts)、[`packages/skill/skill-filesystem/src/index.ts`](../../packages/skill/skill-filesystem/src/index.ts)、[`packages/skill/skill-badge/src/index.ts`](../../packages/skill/skill-badge/src/index.ts)、[`packages/skill/skill-office/src/index.ts`](../../packages/skill/skill-office/src/index.ts)、[`packages/sandbox/sandbox-windows-acl/src/acl-skill.ts`](../../packages/sandbox/sandbox-windows-acl/src/acl-skill.ts) 与 [`packages/skill/tool-skill/src/index.ts`](../../packages/skill/tool-skill/src/index.ts)。
@@ -259,6 +261,21 @@ Host service backing `ctx.remote.skills` without activating a cold Agent.
  * @throws RemoteError when the Session cannot be inspected or no registry can serve it.
  */
 @Remote async list(request: SkillListRequest, signal: AbortSignal): Promise<SkillListValue>
+
+/**
+ * Inventory every skill visible to a Session, including those disabled for user invocation.
+ * @param request - Session whose winning Skill catalog is inspected.
+ * @param signal - caller cancellation signal.
+ * @returns inventory with source ownership and editability.
+ */
+@Remote async manageList(request: SkillListRequest, signal: AbortSignal): Promise<SkillManagementValue>
+
+/**
+ * Edit invocation flags only for a winning Skill file inside this Session's project skill roots.
+ * @param change - Session, Skill name, and invocation flags to persist.
+ * @param signal - caller cancellation signal.
+ */
+@Remote async setInvocation(change: SkillInvocationChange, signal: AbortSignal): Promise<void>
 ```
 
 Source: [`packages/api/session-controller/src/skill-catalog.ts`](../../packages/api/session-controller/src/skill-catalog.ts)
@@ -303,6 +320,9 @@ register(skill: SkillRegistration): () => void
  * @returns all sorted winning summaries.
  */
 async list(options: SkillViewOptions = {}): Promise<SkillSummary[]>
+
+/** Discard cached discovery after a trusted Host editor changes a provider's source file. */
+invalidateCatalog(): void
 
 /**
  * Observe the current invocation-neutral catalog and whether discovery completed within a stable revision.
